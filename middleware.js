@@ -1,6 +1,8 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+
 export async function middleware(request) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -23,24 +25,34 @@ export async function middleware(request) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+  const path = request.nextUrl.pathname;
 
-  // Redirect unauthenticated users away from /dashboard
-  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+  // /admin — sirf admin email access kar sakti hai
+  if (path.startsWith('/admin')) {
+    if (!user) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/login';
+      return NextResponse.redirect(url);
+    }
+    if (user.email !== ADMIN_EMAIL) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/dashboard';
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // /dashboard — login hona chahiye
+  if (!user && path.startsWith('/dashboard')) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
   }
 
-  // Redirect logged-in users away from auth pages
-  if (
-    user &&
-    (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/register')
-  ) {
+  // Login/register page — agar already logged in hai toh redirect
+  if (user && (path === '/login' || path === '/register')) {
     const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
+    url.pathname = user.email === ADMIN_EMAIL ? '/admin' : '/dashboard';
     return NextResponse.redirect(url);
   }
 
