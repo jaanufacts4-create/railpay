@@ -1445,6 +1445,98 @@ function TripModal({ employees, setEmployees, trains, month, onSave, onClose }) 
 }
 
 /* ------------------------------------------------------------------ */
+/*  Mini calendar with running-day highlights                          */
+/* ------------------------------------------------------------------ */
+const DOW_MAP = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DOW_LABELS = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+
+function MiniCalendar({ value, onChange, maxDate, runningDays }) {
+  const runSet = new Set((runningDays || []).map((d) => DOW_MAP[d]));
+  const hasFilter = runSet.size > 0;
+
+  const parseDate = (s) => s ? new Date(s + "T00:00:00") : new Date();
+  const init = parseDate(value);
+  const [viewYear, setViewYear] = useState(init.getFullYear());
+  const [viewMonth, setViewMonth] = useState(init.getMonth());
+
+  const maxD = parseDate(maxDate);
+  maxD.setHours(23, 59, 59);
+  const nowY = maxD.getFullYear(), nowM = maxD.getMonth();
+
+  const prevMonth = () => {
+    if (viewMonth === 0) { setViewYear((y) => y - 1); setViewMonth(11); }
+    else setViewMonth((m) => m - 1);
+  };
+  const nextMonth = () => {
+    if (viewYear > nowY || (viewYear === nowY && viewMonth >= nowM)) return;
+    if (viewMonth === 11) { setViewYear((y) => y + 1); setViewMonth(0); }
+    else setViewMonth((m) => m + 1);
+  };
+
+  const firstDow = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const cells = Array(firstDow).fill(null).concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
+
+  return (
+    <div className="rounded-xl overflow-hidden mt-1" style={{ border: `1px solid ${T.line}` }}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 py-2" style={{ background: T.ink }}>
+        <button type="button" onClick={prevMonth}
+          className="w-6 h-6 flex items-center justify-center rounded text-xs font-bold"
+          style={{ color: T.slateSoft }}>&#8249;</button>
+        <span className="text-[13px] font-semibold" style={{ color: "#fff" }}>
+          {MONTH_NAMES[viewMonth]} {viewYear}
+        </span>
+        <button type="button" onClick={nextMonth}
+          className="w-6 h-6 flex items-center justify-center rounded text-xs font-bold"
+          style={{ color: viewYear === nowY && viewMonth >= nowM ? T.lineSoft : T.slateSoft }}>&#8250;</button>
+      </div>
+      {/* Day-of-week labels */}
+      <div className="grid grid-cols-7" style={{ background: T.paper }}>
+        {DOW_LABELS.map((l) => (
+          <div key={l} className="text-center text-[10px] track font-semibold py-1"
+            style={{ color: T.slateSoft }}>{l}</div>
+        ))}
+      </div>
+      {/* Day cells */}
+      <div className="grid grid-cols-7" style={{ background: T.paper }}>
+        {cells.map((d, i) => {
+          if (!d) return <div key={i} />;
+          const cellDate = new Date(viewYear, viewMonth, d);
+          const dow = cellDate.getDay();
+          const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+          const isFuture = cellDate > maxD;
+          const isRunning = !hasFilter || runSet.has(dow);
+          const isSelected = value === dateStr;
+
+          let bg = "transparent", color = T.ink, opacity = 1, cursor = "pointer", border = "none";
+          if (isFuture) { color = T.lineSoft; cursor = "default"; opacity = 0.4; }
+          else if (isSelected) { bg = T.amberDk; color = "#fff"; }
+          else if (isRunning && hasFilter) { bg = T.amberBg; color = T.amberDk; border = `1px solid ${T.amber}`; }
+          else if (!isRunning) { opacity = 0.35; }
+
+          return (
+            <button key={i} type="button" disabled={isFuture}
+              onClick={() => !isFuture && onChange(dateStr)}
+              className="text-[12px] font-semibold rounded-lg m-0.5 py-1"
+              style={{ background: bg, color, opacity, cursor, border, lineHeight: "1.6" }}>
+              {d}
+            </button>
+          );
+        })}
+      </div>
+      {hasFilter && (
+        <div className="px-3 py-1.5 text-[10px]" style={{ color: T.slateSoft, borderTop: `1px solid ${T.lineSoft}` }}>
+          <span className="inline-block w-3 h-3 rounded mr-1 align-middle" style={{ background: T.amberBg, border: `1px solid ${T.amber}` }} />
+          Running days · <span style={{ color: T.ink, fontWeight: 600 }}>{(runningDays || []).join(", ")}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Batch trip modal                                                   */
 /* ------------------------------------------------------------------ */
 function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose }) {
@@ -1532,13 +1624,10 @@ function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose }
         </div>
       )}
       <div className="grid grid-cols-2 gap-3 mb-4">
-        <label className="block">
+        <div className="block col-span-2">
           <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Date</span>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-            max={today}
-            className="mt-1 w-full rounded-lg px-3 py-2 text-sm num"
-            style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }} />
-        </label>
+          <MiniCalendar value={date} onChange={setDate} maxDate={today} runningDays={selectedTrain?.days} />
+        </div>
         {trains && trains.length > 0 ? (
           <label className="block">
             <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Pick train</span>
