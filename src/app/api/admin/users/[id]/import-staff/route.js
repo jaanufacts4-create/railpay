@@ -31,6 +31,7 @@ export async function POST(request, { params }) {
       contractor_id: contractor.id,
       emp_id: e.empId || '',
       name: e.name || '',
+      father_name: e.fatherName || '',
       designation: e.designation || '',
       per_trip: Number(e.perTrip) || 0,
       phone: e.phone || '',

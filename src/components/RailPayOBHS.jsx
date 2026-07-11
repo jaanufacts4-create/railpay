@@ -885,7 +885,7 @@ function StaffView({ employees, setEmployees, trips, setTrips, designations, set
                     }}
                     style={{ accentColor: T.amber }} />
                 </th>
-                {["Emp ID", "Name", "Designation", "Status", "Per Trip", "Phone", ""].map((h, i) => (
+                {["Emp ID", "Name", "Father's Name", "Designation", "Status", "Per Trip", "Phone", ""].map((h, i) => (
                   <th key={h + i} className="text-left px-4 py-2.5 text-[11px] track uppercase font-semibold"
                     style={{ color: T.slateSoft }}>{h}</th>
                 ))}
@@ -921,6 +921,7 @@ function StaffView({ employees, setEmployees, trips, setTrips, designations, set
                       <div className="text-[11px] truncate" style={{ color: T.slateSoft, maxWidth: 190 }}>{e.remarks}</div>
                     ) : null}
                   </td>
+                  <td className="px-4 py-3 text-[13px]" style={{ color: T.slate }}>{e.fatherName || "—"}</td>
                   <td className="px-4 py-3" style={{ color: T.slate }}>{e.designation}</td>
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold"
@@ -962,6 +963,7 @@ function StaffView({ employees, setEmployees, trips, setTrips, designations, set
 function StaffModal({ emp, designations, setDesignations, onSave, onClose }) {
   const [f, setF] = useState({
     id: emp.id, empId: emp.empId || "", name: emp.name || "",
+    fatherName: emp.fatherName || "",
     designation: emp.designation || designations[0] || "Housekeeper", perTrip: emp.perTrip || "",
     phone: emp.phone || "", status: emp.status || "active", remarks: emp.remarks || "",
   });
@@ -1046,6 +1048,7 @@ function StaffModal({ emp, designations, setDesignations, onSave, onClose }) {
           )}
         </div>
         <div className="col-span-2">{field("Full name", "name", { placeholder: "Employee name" })}</div>
+        <div className="col-span-2">{field("Father's name", "fatherName", { placeholder: "Father's full name" })}</div>
         {field("Per trip salary (₹)", "perTrip", { type: "number", inputMode: "numeric", placeholder: "650" })}
         {field("Phone", "phone", { placeholder: "98xxxxxxxx" })}
         <div className="col-span-2">

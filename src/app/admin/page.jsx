@@ -162,6 +162,7 @@ export default function AdminPage() {
         id: uid(),
         empId: String(pick(row, ['empid', 'employeeid', 'staffid', 'code']) || ''),
         name: String(pick(row, ['name', 'employee', 'staff']) || '').trim(),
+        fatherName: String(pick(row, ['fathername', 'father', 'fathersname', 'fname']) || ''),
         designation: String(pick(row, ['designation', 'post', 'role', 'category']) || ''),
         perTrip: Number(String(pick(row, ['pertrip', 'rate', 'tripsalary', 'salary', 'amount'])).replace(/[^\d.]/g, '')) || 0,
         phone: String(pick(row, ['phone', 'mobile', 'contact']) || ''),
