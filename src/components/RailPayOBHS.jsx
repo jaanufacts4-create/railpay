@@ -788,7 +788,6 @@ function StaffView({ employees, setEmployees, trips, setTrips, designations, set
   const [viewTripsEmps, setViewTripsEmps] = useState(null); // array of employees to show trips for
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [importMsg, setImportMsg] = useState("");
-  const fileRef = useRef(null);
 
   const statusOf = (e) => e.status || "active";
   const activeN = employees.filter((e) => statusOf(e) !== "inactive").length;
@@ -815,45 +814,6 @@ function StaffView({ employees, setEmployees, trips, setTrips, designations, set
     setTrips((prev) => prev.filter((t) => t.empId !== id));
   };
 
-  const onFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf);
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json(ws, { defval: "" });
-      const pick = (row, keys) => {
-        for (const k of Object.keys(row)) {
-          const nk = k.toLowerCase().replace(/[^a-z]/g, "");
-          if (keys.some((t) => nk.includes(t))) return row[k];
-        }
-        return "";
-      };
-      const imported = json
-        .map((row) => ({
-          id: uid(),
-          empId: String(pick(row, ["empid", "employeeid", "staffid", "code", "id"]) || ""),
-          name: String(pick(row, ["name", "employee", "staff"]) || "").trim(),
-          designation: String(pick(row, ["designation", "post", "role", "category"]) || ""),
-          perTrip: Number(String(pick(row, ["pertrip", "rate", "tripsalary", "salary", "amount"])).replace(/[^\d.]/g, "")) || 0,
-          phone: String(pick(row, ["phone", "mobile", "contact"]) || ""),
-          status: "active",
-          remarks: String(pick(row, ["remark", "note"]) || ""),
-        }))
-        .filter((r) => r.name);
-      if (imported.length === 0) {
-        setImportMsg("No rows found. Expected columns: Emp ID, Name, Designation, Per Trip, Phone.");
-      } else {
-        setEmployees((prev) => [...prev, ...imported]);
-        setImportMsg(`Imported ${imported.length} staff from ${file.name}.`);
-      }
-    } catch {
-      setImportMsg("Could not read that file. Use an .xlsx or .csv export.");
-    }
-    if (fileRef.current) fileRef.current.value = "";
-  };
-
   const downloadTemplate = () => {
     const ws = XLSX.utils.json_to_sheet([
       { "Emp ID": "OBHS-201", "Name": "Amit Singh", "Designation": "Housekeeper", "Per Trip": 650, "Phone": "98xxxxxxxx" },
@@ -874,12 +834,6 @@ function StaffView({ employees, setEmployees, trips, setTrips, designations, set
             style={{ color: T.ink, border: "none" }} />
         </div>
         <div className="flex gap-2">
-          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={onFile} className="hidden" />
-          <button onClick={() => fileRef.current?.click()}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold"
-            style={{ background: T.card, border: `1px solid ${T.line}`, color: T.slate }}>
-            <Upload size={15} /> Import Excel
-          </button>
           {selectedIds.size > 0 && (
             <button
               onClick={() => {
@@ -912,15 +866,6 @@ function StaffView({ employees, setEmployees, trips, setTrips, designations, set
         })}
       </div>
 
-      {importMsg && (
-        <div className="flex items-center justify-between rounded-lg px-3 py-2 text-[13px]"
-          style={{ background: T.amberBg, color: T.amberDk }}>
-          <span>{importMsg}</span>
-          <button onClick={downloadTemplate} className="flex items-center gap-1 font-semibold underline">
-            <FileSpreadsheet size={13} /> Template
-          </button>
-        </div>
-      )}
 
       <div className="rounded-xl overflow-hidden" style={{ background: T.card, border: `1px solid ${T.line}` }}>
         <div className="overflow-x-auto">

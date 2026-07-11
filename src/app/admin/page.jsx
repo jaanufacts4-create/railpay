@@ -1,11 +1,12 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import { useRouter } from 'next/navigation';
+import * as XLSX from 'xlsx';
 import {
   Train, Users, Route, Plus, Trash2, X, ShieldCheck,
   LogOut, UserCheck, UserX, RefreshCw, Eye, EyeOff,
-  Settings, CreditCard, CalendarDays, CheckCircle, Clock,
+  Settings, CalendarDays, CheckCircle, Clock, Upload, FileSpreadsheet,
 } from 'lucide-react';
 
 const T = {
@@ -69,7 +70,7 @@ const inp = { background: T.paper, border: `1px solid ${T.line}`, color: T.ink }
 export default function AdminPage() {
   const router = useRouter();
   const supabase = createClient();
-  const [tab, setTab] = useState('clients'); // 'clients' | 'settings'
+  const [tab, setTab] = useState('clients'); // 'clients' | 'import' | 'settings'
 
   // Clients state
   const [users, setUsers] = useState([]);
@@ -101,6 +102,14 @@ export default function AdminPage() {
   const [configSaved, setConfigSaved] = useState(false);
   const [configError, setConfigError] = useState('');
 
+  // Import staff state
+  const importFileRef = useRef(null);
+  const [importClientId, setImportClientId] = useState('');
+  const [importPreview, setImportPreview] = useState(null); // parsed rows
+  const [importFileName, setImportFileName] = useState('');
+  const [importLoading, setImportLoading] = useState(false);
+  const [importMsg, setImportMsg] = useState({ type: '', text: '' });
+
   const fetchUsers = useCallback(async () => {
     setLoading(true); setError('');
     const res = await fetch('/api/admin/users');
@@ -129,6 +138,75 @@ export default function AdminPage() {
   useEffect(() => { fetchUsers(); fetchConfig(); }, [fetchUsers, fetchConfig]);
 
   const handleLogout = async () => { await supabase.auth.signOut(); router.push('/login'); };
+
+  // Import staff helpers
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const pick = (row, keys) => {
+    for (const k of Object.keys(row)) {
+      const nk = k.toLowerCase().replace(/[^a-z]/g, '');
+      if (keys.some((t) => nk.includes(t))) return row[k];
+    }
+    return '';
+  };
+
+  const onImportFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportMsg({ type: '', text: '' });
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      const rows = json.map((row) => ({
+        id: uid(),
+        empId: String(pick(row, ['empid', 'employeeid', 'staffid', 'code']) || ''),
+        name: String(pick(row, ['name', 'employee', 'staff']) || '').trim(),
+        designation: String(pick(row, ['designation', 'post', 'role', 'category']) || ''),
+        perTrip: Number(String(pick(row, ['pertrip', 'rate', 'tripsalary', 'salary', 'amount'])).replace(/[^\d.]/g, '')) || 0,
+        phone: String(pick(row, ['phone', 'mobile', 'contact']) || ''),
+        remarks: String(pick(row, ['remark', 'note']) || ''),
+      })).filter((r) => r.name);
+
+      if (rows.length === 0) {
+        setImportMsg({ type: 'error', text: 'No valid rows found. Columns needed: Emp ID, Name, Designation, Per Trip, Phone.' });
+      } else {
+        setImportPreview(rows);
+        setImportFileName(file.name);
+      }
+    } catch {
+      setImportMsg({ type: 'error', text: 'Could not read file. Use .xlsx or .csv.' });
+    }
+    if (importFileRef.current) importFileRef.current.value = '';
+  };
+
+  const handleImportConfirm = async () => {
+    if (!importClientId || !importPreview) return;
+    setImportLoading(true); setImportMsg({ type: '', text: '' });
+    const res = await fetch(`/api/admin/users/${importClientId}/import-staff`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ employees: importPreview }),
+    });
+    const d = await res.json();
+    if (d.error) {
+      setImportMsg({ type: 'error', text: d.error });
+    } else {
+      setImportMsg({ type: 'success', text: `${d.imported} staff imported successfully!` });
+      setImportPreview(null); setImportFileName('');
+    }
+    setImportLoading(false);
+  };
+
+  const downloadTemplate = () => {
+    const ws = XLSX.utils.json_to_sheet([
+      { 'Emp ID': 'OBHS-201', 'Name': 'Amit Singh', 'Designation': 'Housekeeper', 'Per Trip': 650, 'Phone': '98xxxxxxxx' },
+      { 'Emp ID': 'OBHS-202', 'Name': 'Ravi Kumar', 'Designation': 'Cleaner', 'Per Trip': 550, 'Phone': '97xxxxxxxx' },
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Staff');
+    XLSX.writeFile(wb, 'obhs-staff-template.xlsx');
+  };
 
   // Create user + assign initial plan
   const handleCreate = async (e) => {
@@ -270,6 +348,7 @@ export default function AdminPage() {
         <div className="flex gap-1 mb-4 p-1 rounded-xl w-fit" style={{ background: T.lineSoft }}>
           {[
             { id: 'clients', label: 'Clients', icon: Users },
+            { id: 'import', label: 'Import Staff', icon: Upload },
             { id: 'settings', label: 'Payment Settings', icon: Settings },
           ].map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
@@ -380,6 +459,107 @@ export default function AdminPage() {
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── IMPORT STAFF TAB ── */}
+        {tab === 'import' && (
+          <div className="rounded-xl p-6" style={{ background: T.card, border: `1px solid ${T.line}` }}>
+            <div className="font-bold text-sm mb-1" style={{ color: T.ink }}>Import Staff from Excel</div>
+            <div className="text-[13px] mb-5" style={{ color: T.slateSoft }}>
+              Client select karo, Excel file upload karo, preview dekho, phir import karo.
+            </div>
+
+            <div className="space-y-4 max-w-2xl">
+              {/* Client selector */}
+              <Field label="Select Client">
+                <select value={importClientId} onChange={(e) => { setImportClientId(e.target.value); setImportPreview(null); setImportMsg({ type: '', text: '' }); }}
+                  className="mt-1 w-full rounded-lg px-3 py-2.5 text-sm"
+                  style={inp}>
+                  <option value="">-- Choose a client --</option>
+                  {users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.email}{u.firm_name !== '—' ? ` — ${u.firm_name}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              {/* File upload + template */}
+              {importClientId && (
+                <div className="flex items-center gap-3">
+                  <input ref={importFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={onImportFile} className="hidden" />
+                  <button onClick={() => importFileRef.current?.click()}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold"
+                    style={{ background: T.ink, color: '#fff' }}>
+                    <Upload size={15} /> Upload Excel / CSV
+                  </button>
+                  <button onClick={downloadTemplate}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold"
+                    style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.slate }}>
+                    <FileSpreadsheet size={15} /> Download Template
+                  </button>
+                </div>
+              )}
+
+              {/* Status messages */}
+              {importMsg.text && (
+                <div className="rounded-lg px-4 py-2.5 text-sm"
+                  style={{
+                    background: importMsg.type === 'error' ? T.redBg : T.greenBg,
+                    color: importMsg.type === 'error' ? T.red : T.green,
+                  }}>
+                  {importMsg.text}
+                </div>
+              )}
+
+              {/* Preview table */}
+              {importPreview && (
+                <div>
+                  <div className="text-[13px] font-semibold mb-2" style={{ color: T.ink }}>
+                    Preview — {importPreview.length} staff from <span style={{ color: T.amberDk }}>{importFileName}</span>
+                  </div>
+                  <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${T.line}` }}>
+                    <div className="overflow-x-auto" style={{ maxHeight: 320, overflowY: 'auto' }}>
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0">
+                          <tr style={{ background: T.ink }}>
+                            {['Emp ID', 'Name', 'Designation', 'Per Trip', 'Phone'].map((h) => (
+                              <th key={h} className="px-3 py-2.5 text-left text-[11px] tracking-widest uppercase font-semibold"
+                                style={{ color: '#C7CEDC' }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {importPreview.map((r, i) => (
+                            <tr key={i} style={{ borderTop: `1px solid ${T.lineSoft}` }}>
+                              <td className="px-3 py-2" style={{ color: T.slateSoft, fontFamily: 'monospace' }}>{r.empId || '—'}</td>
+                              <td className="px-3 py-2 font-semibold" style={{ color: T.ink }}>{r.name}</td>
+                              <td className="px-3 py-2" style={{ color: T.slate }}>{r.designation || '—'}</td>
+                              <td className="px-3 py-2" style={{ color: T.amberDk, fontFamily: 'monospace' }}>₹{r.perTrip}</td>
+                              <td className="px-3 py-2" style={{ color: T.slate }}>{r.phone || '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 mt-3">
+                    <button onClick={() => { setImportPreview(null); setImportFileName(''); }}
+                      className="px-4 py-2.5 rounded-lg text-sm font-semibold"
+                      style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.slate }}>
+                      Cancel
+                    </button>
+                    <button onClick={handleImportConfirm} disabled={importLoading}
+                      className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white"
+                      style={{ background: T.green, opacity: importLoading ? 0.7 : 1 }}>
+                      {importLoading ? 'Importing…' : `Import ${importPreview.length} Staff`}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
