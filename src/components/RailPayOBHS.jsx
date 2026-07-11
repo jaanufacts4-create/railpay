@@ -1231,7 +1231,7 @@ function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) 
       </div>
 
       {adding && <TripModal employees={employees} setEmployees={setEmployees} trains={trains} month={month} onSave={add} onClose={() => setAdding(false)} />}
-      {addingBatch && <BatchTripModal employees={employees} trains={trains} month={month} onAddTrips={addBatch} onClose={() => setAddingBatch(false)} />}
+      {addingBatch && <BatchTripModal employees={employees} trains={trains} trips={trips} month={month} onAddTrips={addBatch} onClose={() => setAddingBatch(false)} />}
     </div>
   );
 }
@@ -1447,8 +1447,9 @@ function TripModal({ employees, setEmployees, trains, month, onSave, onClose }) 
 /* ------------------------------------------------------------------ */
 /*  Batch trip modal                                                   */
 /* ------------------------------------------------------------------ */
-function BatchTripModal({ employees, trains, month, onAddTrips, onClose }) {
-  const today = `${month}-${String(new Date().getDate()).padStart(2, "0")}`;
+function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose }) {
+  const todayDate = new Date();
+  const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, "0")}-${String(todayDate.getDate()).padStart(2, "0")}`;
   const [date, setDate] = useState(today);
   const [trainNo, setTrainNo] = useState("");
   const [route, setRoute] = useState("");
@@ -1461,6 +1462,14 @@ function BatchTripModal({ employees, trains, month, onAddTrips, onClose }) {
   );
   const empMap = Object.fromEntries(employees.map((e) => [e.id, e]));
   const savedSet = new Set(savedEmpIds);
+
+  // Employees who already have a trip logged for this exact date+trainNo (from persisted trips data)
+  const alreadyLoggedSet = useMemo(() => {
+    if (!date || !trainNo || !(trips || []).length) return new Set();
+    return new Set(
+      (trips || []).filter((t) => t.date === date && t.trainNo === trainNo).map((t) => t.empId)
+    );
+  }, [trips, date, trainNo]);
 
   const setRow = (empId, key, val) =>
     setRows((prev) => prev.map((r) => (r.empId === empId ? { ...r, [key]: val } : r)));
@@ -1480,6 +1489,11 @@ function BatchTripModal({ employees, trains, month, onAddTrips, onClose }) {
   const valid = date && checked.length > 0;
 
   const save = () => {
+    const dupes = checked.filter((r) => alreadyLoggedSet.has(r.empId));
+    if (dupes.length > 0) {
+      const names = dupes.map((r) => empMap[r.empId]?.name || r.empId).join(", ");
+      if (!window.confirm(`${names} already ${dupes.length > 1 ? "have" : "has"} a trip logged for this date & train. Save anyway?`)) return;
+    }
     const justSaved = checked.map((r) => r.empId);
     onAddTrips(checked.map((r) => ({
       empId: r.empId, date, trainNo, route,
@@ -1521,6 +1535,7 @@ function BatchTripModal({ employees, trains, month, onAddTrips, onClose }) {
         <label className="block">
           <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Date</span>
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+            max={today}
             className="mt-1 w-full rounded-lg px-3 py-2 text-sm num"
             style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }} />
         </label>
@@ -1597,11 +1612,15 @@ function BatchTripModal({ employees, trains, month, onAddTrips, onClose }) {
                         className="w-4 h-4 cursor-pointer" />
                     </td>
                     <td className="px-3 py-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <div className="font-semibold text-[13px]" style={{ color: T.ink }}>{emp.name}</div>
-                        {savedSet.has(r.empId) && r.checked && (
+                        {(savedSet.has(r.empId) || alreadyLoggedSet.has(r.empId)) && r.checked && (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
                             style={{ background: T.redBg, color: T.red }}>Already punched!</span>
+                        )}
+                        {alreadyLoggedSet.has(r.empId) && !r.checked && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                            style={{ background: T.redBg, color: T.red }}>Duplicate</span>
                         )}
                       </div>
                       <div className="text-[11px] num" style={{ color: T.slateSoft }}>{emp.empId}</div>
