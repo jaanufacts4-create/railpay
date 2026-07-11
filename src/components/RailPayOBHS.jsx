@@ -248,7 +248,9 @@ export default function App({ onLogout }) {
         const food = et.reduce((s, t) => s + (Number(t.food) || 0), 0);
         const advance = et.reduce((s, t) => s + (Number(t.advance) || 0), 0);
         const net = gross - food - advance;
-        return { emp: e, trips: et, count, gross, food, advance, net };
+        const hasVarRate = et.length > 0 && et.some((t) => t.rate && Number(t.rate) !== Number(e.perTrip));
+        const rateLabel = hasVarRate ? "Variable rate" : money(e.perTrip) + "/trip";
+        return { emp: e, trips: et, count, gross, food, advance, net, rateLabel };
       });
   }, [employees, trips, month]);
 
@@ -1150,62 +1152,68 @@ function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) 
   const add = (trip) => { setTrips((prev) => [...prev, { ...trip, id: uid() }]); setAdding(false); };
   const remove = (id) => setTrips((prev) => prev.filter((t) => t.id !== id));
 
+  const tripRows = monthTrips.map((t) => {
+    const emp = employees.find((e) => e.id === t.empId);
+    const rate = Number(t.rate) || Number(emp?.perTrip) || 0;
+    return { t, emp, rate };
+  });
+
+  const tripHeaders = [“Date”, “Staff”, “Train”, “Route”, “Rate”, “Food (-)”, “Advance (-)”, “”];
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
+    <div className=”space-y-4”>
+      <div className=”flex flex-col sm:flex-row gap-3 sm:items-center justify-between”>
         <div>
-          <div className="text-sm font-bold" style={{ color: T.ink }}>Trip log — {monthLabel(month)}</div>
-          <div className="text-[12px]" style={{ color: T.slateSoft }}>{monthTrips.length} trips</div>
+          <div className=”text-sm font-bold” style={{ color: T.ink }}>Trip log &mdash; {monthLabel(month)}</div>
+          <div className=”text-[12px]” style={{ color: T.slateSoft }}>{monthTrips.length} trips</div>
         </div>
-        <div className="flex gap-2">
+        <div className=”flex gap-2”>
           <select value={filterEmp} onChange={(e) => setFilterEmp(e.target.value)}
-            className="rounded-lg px-3 py-2 text-sm"
+            className=”rounded-lg px-3 py-2 text-sm”
             style={{ background: T.card, border: `1px solid ${T.line}`, color: T.ink }}>
-            <option value="all">All staff</option>
+            <option value=”all”>All staff</option>
             {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
           <button onClick={() => setAdding(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold text-white"
+            className=”flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold text-white”
             style={{ background: T.ink }}>
             <Plus size={15} /> Log trip
           </button>
         </div>
       </div>
 
-      <div className="rounded-xl overflow-hidden" style={{ background: T.card, border: `1px solid ${T.line}` }}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[640px]">
+      <div className=”rounded-xl overflow-hidden” style={{ background: T.card, border: `1px solid ${T.line}` }}>
+        <div className=”overflow-x-auto”>
+          <table className=”w-full text-sm min-w-[640px]”>
             <thead>
               <tr style={{ background: T.lineSoft }}>
-                {["Date", "Staff", "Train", "Route", "Rate", "Food (−)", "Advance (−)", ""].map((h, i) => (
-                  <th key={h + i} className={`px-4 py-2.5 text-[11px] track uppercase font-semibold ${i >= 4 ? "text-right" : "text-left"}`}
+                {tripHeaders.map((h, i) => (
+                  <th key={h + i} className={“px-4 py-2.5 text-[11px] track uppercase font-semibold “ + (i >= 4 ? “text-right” : “text-left”)}
                     style={{ color: T.slateSoft }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {monthTrips.map((t) => {
-                const emp = employees.find((e) => e.id === t.empId);
-                const tripRate = Number(t.rate) || Number(emp?.perTrip) || 0;
-                return (
-                <tr key={t.id} className="rowhover" style={{ borderTop: `1px solid ${T.lineSoft}` }}>
-                  <td className="px-4 py-3 num text-[13px]" style={{ color: T.slate }}>{t.date.slice(8)}/{t.date.slice(5, 7)}</td>
-                  <td className="px-4 py-3 font-semibold" style={{ color: T.ink }}>{empName(t.empId)}</td>
-                  <td className="px-4 py-3 num text-[13px]" style={{ color: T.slate }}>{t.trainNo}</td>
-                  <td className="px-4 py-3 text-[13px]" style={{ color: T.slate }}>{t.route}</td>
-                  <td className="px-4 py-3 num text-right font-semibold" style={{ color: T.ink }}>{money(tripRate)}</td>
-                  <td className="px-4 py-3 num text-right" style={{ color: t.food ? T.red : T.slateSoft }}>{t.food ? "−" + money(t.food) : "—"}</td>
-                  <td className="px-4 py-3 num text-right" style={{ color: t.advance ? T.red : T.slateSoft }}>{t.advance ? "−" + money(t.advance) : "—"}</td>
-                  <td className="px-4 py-3 text-right">
-                    <button onClick={() => remove(t.id)} className="p-1.5" style={{ color: T.red }}><Trash2 size={15} /></button>
+              {tripRows.map(({ t, rate }) => (
+                <tr key={t.id} className=”rowhover” style={{ borderTop: “1px solid “ + T.lineSoft }}>
+                  <td className=”px-4 py-3 num text-[13px]” style={{ color: T.slate }}>{t.date.slice(8)}/{t.date.slice(5, 7)}</td>
+                  <td className=”px-4 py-3 font-semibold” style={{ color: T.ink }}>{empName(t.empId)}</td>
+                  <td className=”px-4 py-3 num text-[13px]” style={{ color: T.slate }}>{t.trainNo}</td>
+                  <td className=”px-4 py-3 text-[13px]” style={{ color: T.slate }}>{t.route}</td>
+                  <td className=”px-4 py-3 num text-right font-semibold” style={{ color: T.ink }}>{money(rate)}</td>
+                  <td className=”px-4 py-3 num text-right” style={{ color: t.food ? T.red : T.slateSoft }}>{t.food ? “-” + money(t.food) : “-”}</td>
+                  <td className=”px-4 py-3 num text-right” style={{ color: t.advance ? T.red : T.slateSoft }}>{t.advance ? “-” + money(t.advance) : “-”}</td>
+                  <td className=”px-4 py-3 text-right”>
+                    <button onClick={() => remove(t.id)} className=”p-1.5” style={{ color: T.red }}><Trash2 size={15} /></button>
                   </td>
                 </tr>
-                );
-              })}
-              {monthTrips.length === 0 && (
-                <tr><td colSpan={8} className=”px-4 py-8 text-center text-sm” style={{ color: T.slateSoft }}>
-                  No trips logged. Tap “Log trip” to add the first one.
-                </td></tr>
+              ))}
+              {tripRows.length === 0 && (
+                <tr>
+                  <td colSpan={8} className=”px-4 py-8 text-center text-sm” style={{ color: T.slateSoft }}>
+                    No trips logged. Tap &quot;Log trip&quot; to add the first one.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
@@ -2297,9 +2305,7 @@ function SalaryView({ rows, totals, month, firm, onPayslip }) {
                   <td className="px-4 py-3">
                     <div className="font-semibold" style={{ color: T.ink }}>{r.emp.name}</div>
                     <div className="text-[11px] num" style={{ color: T.slateSoft }}>
-                      {r.emp.empId} · {r.trips.length > 0 && r.trips.some((t) => t.rate && Number(t.rate) !== Number(r.emp.perTrip))
-                        ? "Variable rate"
-                        : money(r.emp.perTrip) + "/trip"}
+                      {r.emp.empId} · {r.rateLabel}
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right num" style={{ color: T.slate }}>{r.count}</td>
