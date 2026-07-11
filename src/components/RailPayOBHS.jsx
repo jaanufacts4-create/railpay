@@ -282,7 +282,7 @@ export default function App({ onLogout }) {
 
   const nav = [
     { id: "dashboard", label: "Dashboard", icon: LayoutGrid },
-    { id: "employees", label: "Staff", icon: Users },
+    { id: "employees", label: "Total Staff On Roll", icon: Users },
     { id: "trips", label: "Trip Log", icon: Route },
     { id: "planning", label: "Train Logs", icon: ClipboardList },
     { id: "hours", label: "Hours & Penalty", icon: AlertTriangle },
