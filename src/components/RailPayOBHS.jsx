@@ -244,10 +244,10 @@ export default function App({ onLogout }) {
       .map((e) => {
         const et = monthTrips.filter((t) => t.empId === e.id);
         const count = et.length;
-        const gross = count * (Number(e.perTrip) || 0);
+        const gross = et.reduce((s, t) => s + (Number(t.rate) || Number(e.perTrip) || 0), 0);
         const food = et.reduce((s, t) => s + (Number(t.food) || 0), 0);
         const advance = et.reduce((s, t) => s + (Number(t.advance) || 0), 0);
-        const net = gross + food - advance;
+        const net = gross - food - advance;
         return { emp: e, trips: et, count, gross, food, advance, net };
       });
   }, [employees, trips, month]);
@@ -625,8 +625,8 @@ function EmpTripsModal({ emps, trips, onClose }) {
 
   const totalFood = filtered.reduce((s, t) => s + (Number(t.food) || 0), 0);
   const totalAdv = filtered.reduce((s, t) => s + (Number(t.advance) || 0), 0);
-  const gross = filtered.reduce((s, t) => s + (Number(empMap[t.empId]?.perTrip) || 0), 0);
-  const net = gross + totalFood - totalAdv;
+  const gross = filtered.reduce((s, t) => s + (Number(t.rate) || Number(empMap[t.empId]?.perTrip) || 0), 0);
+  const net = gross - totalFood - totalAdv;
 
   function exportXLSX() {
     const rows = filtered.map((t) => {
@@ -638,7 +638,7 @@ function EmpTripsModal({ emps, trips, onClose }) {
       row["Route"] = t.route || "";
       row["Food (₹)"] = Number(t.food) || 0;
       row["Advance (₹)"] = Number(t.advance) || 0;
-      row["Per Trip (₹)"] = Number(emp?.perTrip) || 0;
+      row["Per Trip (₹)"] = Number(t.rate) || Number(emp?.perTrip) || 0;
       return row;
     });
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -756,7 +756,7 @@ function EmpTripsModal({ emps, trips, onClose }) {
               <span className="font-bold num" style={{ color: T.ink }}>{money(gross)}</span>
             </div>
             {totalFood > 0 && (
-              <div className="text-[12px]" style={{ color: T.green }}>+Food {money(totalFood)}</div>
+              <div className="text-[12px]" style={{ color: T.red }}>−Food {money(totalFood)}</div>
             )}
             {totalAdv > 0 && (
               <div className="text-[12px]" style={{ color: T.red }}>−Adv {money(totalAdv)}</div>
@@ -1312,9 +1312,15 @@ function TripModal({ employees, setEmployees, trains, month, onSave, onClose }) 
   const [f, setF] = useState({
     empId: employees[0]?.id || "", date: `${month}-${String(new Date().getDate()).padStart(2, "0")}`,
     trainNo: "", route: "", food: "", advance: "",
+    rate: String(employees[0]?.perTrip || ""),
   });
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const valid = f.empId && f.date;
+
+  const onPickEmp = (id) => {
+    const emp = employees.find((e) => e.id === id);
+    setF((p) => ({ ...p, empId: id, rate: String(emp?.perTrip || p.rate) }));
+  };
 
   const onPickTrain = (id) => {
     const t = (trains || []).find((x) => x.id === id);
@@ -1326,7 +1332,7 @@ function TripModal({ employees, setEmployees, trains, month, onSave, onClose }) 
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
           <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Staff</span>
-          <StaffPicker employees={employees} setEmployees={setEmployees} value={f.empId} onChange={(id) => set("empId", id)} />
+          <StaffPicker employees={employees} setEmployees={setEmployees} value={f.empId} onChange={onPickEmp} />
         </div>
         {trains && trains.length > 0 && (
           <label className="block col-span-2">
@@ -1360,7 +1366,15 @@ function TripModal({ employees, setEmployees, trains, month, onSave, onClose }) 
             style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }} />
         </label>
         <label className="block">
-          <span className="text-[11px] track uppercase font-semibold flex items-center gap-1" style={{ color: T.green }}>
+          <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>
+            Per Trip Rate (₹)
+          </span>
+          <input type="number" inputMode="numeric" value={f.rate} onChange={(e) => set("rate", e.target.value)} placeholder="650"
+            className="mt-1 w-full rounded-lg px-3 py-2 text-sm num"
+            style={{ background: T.paper, border: `1px solid ${T.amber}`, color: T.ink }} />
+        </label>
+        <label className="block">
+          <span className="text-[11px] track uppercase font-semibold flex items-center gap-1" style={{ color: T.red }}>
             <Utensils size={12} /> Food money (₹)
           </span>
           <input type="number" inputMode="numeric" value={f.food} onChange={(e) => set("food", e.target.value)} placeholder="150"
@@ -1377,13 +1391,13 @@ function TripModal({ employees, setEmployees, trains, month, onSave, onClose }) 
         </label>
       </div>
       <p className="text-[11px] mt-3" style={{ color: T.slateSoft }}>
-        Food money is added to salary. Advance is deducted at month end.
+        Net Payable = Gross − Food Money − Advance
       </p>
       <div className="flex gap-2 mt-4">
         <button onClick={onClose} className="flex-1 py-2.5 rounded-lg text-sm font-semibold"
           style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.slate }}>Cancel</button>
         <button disabled={!valid}
-          onClick={() => onSave({ ...f, food: Number(f.food) || 0, advance: Number(f.advance) || 0 })}
+          onClick={() => onSave({ ...f, food: Number(f.food) || 0, advance: Number(f.advance) || 0, rate: Number(f.rate) || 0 })}
           className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-white"
           style={{ background: valid ? T.ink : T.slateSoft }}>Save trip</button>
       </div>
@@ -2279,7 +2293,7 @@ function SalaryView({ rows, totals, month, firm, onPayslip }) {
                   </td>
                   <td className="px-4 py-3 text-right num" style={{ color: T.slate }}>{r.count}</td>
                   <td className="px-4 py-3 text-right num" style={{ color: T.ink }}>{money(r.gross)}</td>
-                  <td className="px-4 py-3 text-right num" style={{ color: T.green }}>{r.food ? "+" + money(r.food) : "—"}</td>
+                  <td className="px-4 py-3 text-right num" style={{ color: r.food ? T.red : T.slateSoft }}>{r.food ? "−" + money(r.food) : "—"}</td>
                   <td className="px-4 py-3 text-right num" style={{ color: r.advance ? T.red : T.slateSoft }}>{r.advance ? "−" + money(r.advance) : "—"}</td>
                   <td className="px-4 py-3 text-right num font-extrabold" style={{ color: T.ink }}>{money(r.net)}</td>
                   <td className="px-4 py-3 text-right">
@@ -2294,7 +2308,7 @@ function SalaryView({ rows, totals, month, firm, onPayslip }) {
                 <td className="px-4 py-3 font-extrabold" style={{ color: T.ink }}>TOTAL</td>
                 <td className="px-4 py-3 text-right num font-bold" style={{ color: T.ink }}>{totals.count}</td>
                 <td className="px-4 py-3 text-right num font-bold" style={{ color: T.ink }}>{money(totals.gross)}</td>
-                <td className="px-4 py-3 text-right num font-bold" style={{ color: T.green }}>+{money(totals.food)}</td>
+                <td className="px-4 py-3 text-right num font-bold" style={{ color: T.red }}>−{money(totals.food)}</td>
                 <td className="px-4 py-3 text-right num font-bold" style={{ color: T.red }}>−{money(totals.advance)}</td>
                 <td className="px-4 py-3 text-right num font-extrabold" style={{ color: T.amberDk }}>{money(totals.net)}</td>
                 <td></td>
@@ -2304,7 +2318,7 @@ function SalaryView({ rows, totals, month, firm, onPayslip }) {
         </div>
       </div>
       <p className="text-[12px]" style={{ color: T.slateSoft }}>
-        Net Payable = (Trips × Per Trip) + Food Money − Advance
+        Net Payable = Gross Salary − Food Money − Advance
       </p>
     </div>
   );
@@ -2348,9 +2362,9 @@ function Payslip({ data, month, firm, onClose }) {
 
       <div className="rounded-lg mb-4" style={{ background: T.paper, border: `1px solid ${T.line}` }}>
         <div className="px-4">
-          {line(`Trips completed (× ${money(emp.perTrip)})`, `${count} × = ${money(gross)}`, T.ink)}
+          {line(`Trips completed`, `${count} trips`, T.ink)}
           {line("Gross trip salary", money(gross), T.ink, true)}
-          {line("Food money", "+ " + money(food), T.green)}
+          {line("Food money", "− " + money(food), T.red)}
           {line("Advance recovered", "− " + money(advance), T.red)}
         </div>
         <div className="flex items-center justify-between px-4 py-3.5 rounded-b-lg" style={{ background: T.ink }}>
@@ -2370,7 +2384,8 @@ function Payslip({ data, month, firm, onClose }) {
                 <td className="px-3 py-2 num" style={{ color: T.slate }}>{t.date.slice(8)}/{t.date.slice(5, 7)}</td>
                 <td className="px-3 py-2 num" style={{ color: T.slate }}>{t.trainNo}</td>
                 <td className="px-3 py-2" style={{ color: T.slate }}>{t.route}</td>
-                <td className="px-3 py-2 num text-right" style={{ color: T.green }}>{t.food ? "+" + money(t.food) : ""}</td>
+                <td className="px-3 py-2 num text-right font-semibold" style={{ color: T.ink }}>{money(t.rate || emp.perTrip)}</td>
+                <td className="px-3 py-2 num text-right" style={{ color: T.red }}>{t.food ? "−" + money(t.food) : ""}</td>
                 <td className="px-3 py-2 num text-right" style={{ color: T.red }}>{t.advance ? "−" + money(t.advance) : ""}</td>
               </tr>
             ))}
