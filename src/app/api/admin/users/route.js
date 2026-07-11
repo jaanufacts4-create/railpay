@@ -23,7 +23,7 @@ export async function GET() {
   // Get all contractor records
   const { data: contractors } = await admin
     .from('contractors')
-    .select('user_id, firm_name, owner_name, city');
+    .select('id, user_id, firm_name, owner_name, city');
 
   // Get employee counts per contractor
   const { data: empCounts } = await admin
@@ -48,18 +48,37 @@ export async function GET() {
     tripMap[t.contractor_id] = (tripMap[t.contractor_id] || 0) + 1;
   });
 
-  // Get contractor id map
-  const { data: contractorIds } = await admin
-    .from('contractors')
-    .select('id, user_id');
-  const idMap = {};
-  (contractorIds || []).forEach((c) => { idMap[c.user_id] = c.id; });
+  // Get subscriptions for all contractors
+  const contractorIdList = (contractors || []).map((c) => c.id);
+  let subMap = {};
+  if (contractorIdList.length > 0) {
+    const { data: subs } = await admin
+      .from('subscriptions')
+      .select('contractor_id, plan, end_date, status')
+      .in('contractor_id', contractorIdList)
+      .order('created_at', { ascending: false });
+
+    // Keep only latest sub per contractor
+    (subs || []).forEach((s) => {
+      if (!subMap[s.contractor_id]) subMap[s.contractor_id] = s;
+    });
+  }
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
 
   const users = (authData?.users || [])
     .filter((u) => u.email !== ADMIN_EMAIL)
     .map((u) => {
       const c = contractorMap[u.user_id] || null;
-      const cid = idMap[u.user_id];
+      const cid = c?.id;
+      const sub = cid ? subMap[cid] : null;
+
+      let daysLeft = null;
+      if (sub?.end_date) {
+        const end = new Date(sub.end_date); end.setHours(0, 0, 0, 0);
+        daysLeft = Math.ceil((end - today) / (1000 * 60 * 60 * 24));
+      }
+
       return {
         id: u.id,
         email: u.email,
@@ -71,6 +90,10 @@ export async function GET() {
         employees: cid ? (empMap[cid] || 0) : 0,
         trips: cid ? (tripMap[cid] || 0) : 0,
         confirmed: !!u.email_confirmed_at,
+        plan: sub?.plan || null,
+        sub_status: sub ? (daysLeft < 0 ? 'expired' : sub.status) : null,
+        sub_end_date: sub?.end_date || null,
+        days_left: daysLeft !== null ? Math.max(0, daysLeft) : null,
       };
     });
 
