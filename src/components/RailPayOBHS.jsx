@@ -1164,7 +1164,7 @@ function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) 
     <div className=”space-y-4”>
       <div className=”flex flex-col sm:flex-row gap-3 sm:items-center justify-between”>
         <div>
-          <div className=”text-sm font-bold” style={{ color: T.ink }}>Trip log &mdash; {monthLabel(month)}</div>
+          <div className=”text-sm font-bold” style={{ color: T.ink }}>{“Trip log — “}{monthLabel(month)}</div>
           <div className=”text-[12px]” style={{ color: T.slateSoft }}>{monthTrips.length} trips</div>
         </div>
         <div className=”flex gap-2”>
@@ -1211,7 +1211,7 @@ function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) 
               {tripRows.length === 0 && (
                 <tr>
                   <td colSpan={8} className=”px-4 py-8 text-center text-sm” style={{ color: T.slateSoft }}>
-                    No trips logged. Tap &quot;Log trip&quot; to add the first one.
+                    No trips logged. Tap Log trip to add the first one.
                   </td>
                 </tr>
               )}
