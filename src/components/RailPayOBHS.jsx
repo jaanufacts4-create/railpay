@@ -1512,10 +1512,11 @@ function MiniCalendar({ value, onChange, maxDate, runningDays }) {
           const isRunning = !hasFilter || runSet.has(dow);
           const isSelected = value === dateStr;
 
+          const NEON = "#39FF14", NEON_BG = "rgba(57,255,20,0.18)", NEON_DK = "#1A5E08";
           let bg = "transparent", color = T.ink, opacity = 1, cursor = "pointer", border = "none";
           if (isFuture) { color = T.lineSoft; cursor = "default"; opacity = 0.4; }
-          else if (isSelected) { bg = T.amberDk; color = "#fff"; }
-          else if (isRunning && hasFilter) { bg = T.amberBg; color = T.amberDk; border = `1px solid ${T.amber}`; }
+          else if (isSelected) { bg = NEON; color = NEON_DK; border = `2px solid ${NEON_DK}`; }
+          else if (isRunning && hasFilter) { bg = NEON_BG; color = NEON_DK; border = `1.5px solid ${NEON}`; }
           else if (!isRunning) { opacity = 0.35; }
 
           return (
@@ -1530,7 +1531,7 @@ function MiniCalendar({ value, onChange, maxDate, runningDays }) {
       </div>
       {hasFilter && (
         <div className="px-3 py-1.5 text-[10px]" style={{ color: T.slateSoft, borderTop: `1px solid ${T.lineSoft}` }}>
-          <span className="inline-block w-3 h-3 rounded mr-1 align-middle" style={{ background: T.amberBg, border: `1px solid ${T.amber}` }} />
+          <span className="inline-block w-3 h-3 rounded mr-1 align-middle" style={{ background: "rgba(57,255,20,0.18)", border: "1.5px solid #39FF14" }} />
           Running days · <span style={{ color: T.ink, fontWeight: 600 }}>{(runningDays || []).join(", ")}</span>
         </div>
       )}
@@ -1606,158 +1607,180 @@ function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose }
   const toggleAll = () => setRows((prev) => prev.map((r) => visibleIds.has(r.empId) ? { ...r, checked: !allChecked } : r));
 
   return (
-    <Modal onClose={onClose} title="Log batch trips" wide>
-      {savedEmpIds.length > 0 && (
-        <div className="rounded-xl px-4 py-3 mb-4" style={{ background: T.greenBg, border: `1px solid ${T.green}` }}>
-          <div className="text-[11px] track uppercase font-semibold mb-2" style={{ color: T.green }}>
-            Punched — {savedEmpIds.length} saved
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {savedEmpIds.map((id) => {
-              const emp = empMap[id];
-              return (
-                <span key={id} className="px-2 py-1 rounded-lg text-[11px] font-semibold num"
-                  style={{ background: T.green, color: "#fff" }}>
-                  {emp?.name} ({emp?.empId})
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      )}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="block col-span-2">
-          <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Date</span>
-          <MiniCalendar value={date} onChange={setDate} maxDate={today} runningDays={selectedTrain?.days} />
-        </div>
-        {trains && trains.length > 0 ? (
-          <label className="block">
-            <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Pick train</span>
-            <select onChange={(e) => onPickTrain(e.target.value)} defaultValue=""
-              className="mt-1 w-full rounded-lg px-3 py-2 text-sm"
-              style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }}>
-              <option value="" disabled>Select a train...</option>
-              {trains.map((t) => <option key={t.id} value={t.id}>{t.trainNo} - {t.name}</option>)}
-            </select>
-          </label>
-        ) : null}
-        {selectedTrain && (
-          <div className="col-span-2 flex flex-wrap items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold"
-            style={{ background: T.amberBg, border: `1px solid ${T.amber}`, color: T.amberDk }}>
-            <span>Required Manpower: {selectedTrain.ehk + selectedTrain.janitors} total</span>
-            <span style={{ color: T.slateSoft, fontWeight: 400 }}>|</span>
-            <span>EHK — {String(selectedTrain.ehk).padStart(2, "0")}</span>
-            <span style={{ color: T.slateSoft, fontWeight: 400 }}>|</span>
-            <span>Janitors — {String(selectedTrain.janitors).padStart(2, "0")}</span>
-          </div>
-        )}
-        <label className="block">
-          <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Train no.</span>
-          <input value={trainNo} onChange={(e) => setTrainNo(e.target.value)} placeholder="12030"
-            className="mt-1 w-full rounded-lg px-3 py-2 text-sm"
-            style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }} />
-        </label>
-        <label className="block">
-          <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Route</span>
-          <input value={route} onChange={(e) => setRoute(e.target.value)} placeholder="ASR - NDLS"
-            className="mt-1 w-full rounded-lg px-3 py-2 text-sm"
-            style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }} />
-        </label>
-      </div>
+    <Modal onClose={onClose} title="Log batch trips" fullscreen>
+      <div className="flex flex-col lg:flex-row gap-5 h-full">
 
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>
-          Select staff for this trip
+        {/* ── LEFT COLUMN: date + train ── */}
+        <div className="lg:w-72 xl:w-80 shrink-0 space-y-3">
+
+          {/* Punched chips */}
+          {savedEmpIds.length > 0 && (
+            <div className="rounded-xl px-4 py-3" style={{ background: T.greenBg, border: `1px solid ${T.green}` }}>
+              <div className="text-[11px] track uppercase font-semibold mb-2" style={{ color: T.green }}>
+                Punched — {savedEmpIds.length} saved
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {savedEmpIds.map((id) => {
+                  const emp = empMap[id];
+                  return (
+                    <span key={id} className="px-2 py-1 rounded-lg text-[11px] font-semibold num"
+                      style={{ background: T.green, color: "#fff" }}>
+                      {emp?.name} ({emp?.empId})
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Calendar */}
+          <div>
+            <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Date</span>
+            <MiniCalendar value={date} onChange={setDate} maxDate={today} runningDays={selectedTrain?.days} />
+          </div>
+
+          {/* Train picker */}
+          {trains && trains.length > 0 && (
+            <label className="block">
+              <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Pick train</span>
+              <select onChange={(e) => onPickTrain(e.target.value)} defaultValue=""
+                className="mt-1 w-full rounded-lg px-3 py-2 text-sm"
+                style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }}>
+                <option value="" disabled>Select a train...</option>
+                {trains.map((t) => <option key={t.id} value={t.id}>{t.trainNo} - {t.name}</option>)}
+              </select>
+            </label>
+          )}
+
+          {/* Manpower banner */}
+          {selectedTrain && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold"
+              style={{ background: T.amberBg, border: `1px solid ${T.amber}`, color: T.amberDk }}>
+              <span>{selectedTrain.ehk + selectedTrain.janitors} total</span>
+              <span style={{ color: T.slateSoft, fontWeight: 400 }}>·</span>
+              <span>EHK — {String(selectedTrain.ehk).padStart(2, "0")}</span>
+              <span style={{ color: T.slateSoft, fontWeight: 400 }}>·</span>
+              <span>Janitors — {String(selectedTrain.janitors).padStart(2, "0")}</span>
+            </div>
+          )}
+
+          {/* Train no + Route */}
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block">
+              <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Train no.</span>
+              <input value={trainNo} onChange={(e) => setTrainNo(e.target.value)} placeholder="12030"
+                className="mt-1 w-full rounded-lg px-3 py-2 text-sm"
+                style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }} />
+            </label>
+            <label className="block">
+              <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Route</span>
+              <input value={route} onChange={(e) => setRoute(e.target.value)} placeholder="ASR - NDLS"
+                className="mt-1 w-full rounded-lg px-3 py-2 text-sm"
+                style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }} />
+            </label>
+          </div>
         </div>
-        <div className="relative">
-          <Search size={13} style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: T.slateSoft }} />
-          <input value={staffQ} onChange={(e) => setStaffQ(e.target.value)}
-            placeholder="Search staff..."
-            className="rounded-lg pl-7 pr-3 py-1.5 text-[12px]"
-            style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink, width: 160 }} />
-        </div>
-      </div>
-      <div className="rounded-xl overflow-hidden mb-4" style={{ border: `1px solid ${T.line}` }}>
-        <div className="overflow-x-auto" style={{ maxHeight: 300, overflowY: "auto" }}>
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ background: T.ink }}>
-                <th className="px-3 py-2.5 text-left" style={{ width: 36 }}>
-                  <input type="checkbox" checked={allChecked} onChange={toggleAll} className="w-4 h-4 cursor-pointer" />
-                </th>
-                <th className="px-3 py-2.5 text-left text-[11px] track uppercase font-semibold" style={{ color: "#C7CEDC" }}>Staff</th>
-                <th className="px-3 py-2.5 text-right text-[11px] track uppercase font-semibold" style={{ color: T.amber }}>Rate (Rs.)</th>
-                <th className="px-3 py-2.5 text-right text-[11px] track uppercase font-semibold" style={{ color: "#C7CEDC" }}>Food (Rs.)</th>
-                <th className="px-3 py-2.5 text-right text-[11px] track uppercase font-semibold" style={{ color: "#C7CEDC" }}>Advance (Rs.)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleRows.map((r) => {
-                const emp = empMap[r.empId];
-                if (!emp) return null;
-                return (
-                  <tr key={r.empId} style={{ borderTop: `1px solid ${T.lineSoft}`, background: r.checked ? T.amberBg : "transparent" }}>
-                    <td className="px-3 py-2">
-                      <input type="checkbox" checked={r.checked}
-                        onChange={(e) => setRow(r.empId, "checked", e.target.checked)}
-                        className="w-4 h-4 cursor-pointer" />
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <div className="font-semibold text-[13px]" style={{ color: T.ink }}>{emp.name}</div>
-                        {(savedSet.has(r.empId) || alreadyLoggedSet.has(r.empId)) && r.checked && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                            style={{ background: T.redBg, color: T.red }}>Already punched!</span>
-                        )}
-                        {alreadyLoggedSet.has(r.empId) && !r.checked && (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
-                            style={{ background: T.redBg, color: T.red }}>Duplicate</span>
-                        )}
-                      </div>
-                      <div className="text-[11px] num" style={{ color: T.slateSoft }}>{emp.empId}</div>
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <input type="number" inputMode="numeric" value={r.rate}
-                        onChange={(e) => setRow(r.empId, "rate", e.target.value)}
-                        disabled={!r.checked}
-                        className="w-20 rounded px-2 py-1 text-sm num text-right"
-                        style={{ background: r.checked ? T.paper : T.lineSoft, border: `1px solid ${r.checked ? T.amber : "transparent"}`, color: T.ink }} />
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <input type="number" inputMode="numeric" value={r.food}
-                        onChange={(e) => setRow(r.empId, "food", e.target.value)}
-                        disabled={!r.checked} placeholder="0"
-                        className="w-20 rounded px-2 py-1 text-sm num text-right"
-                        style={{ background: r.checked ? T.paper : T.lineSoft, border: `1px solid ${r.checked ? T.line : "transparent"}`, color: T.ink }} />
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <input type="number" inputMode="numeric" value={r.advance}
-                        onChange={(e) => setRow(r.empId, "advance", e.target.value)}
-                        disabled={!r.checked} placeholder="0"
-                        className="w-20 rounded px-2 py-1 text-sm num text-right"
-                        style={{ background: r.checked ? T.paper : T.lineSoft, border: `1px solid ${r.checked ? T.line : "transparent"}`, color: T.ink }} />
-                    </td>
+
+        {/* ── RIGHT COLUMN: staff table ── */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>
+              Select staff for this trip
+            </div>
+            <div className="relative">
+              <Search size={13} style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: T.slateSoft }} />
+              <input value={staffQ} onChange={(e) => setStaffQ(e.target.value)}
+                placeholder="Search staff..."
+                className="rounded-lg pl-7 pr-3 py-1.5 text-[12px]"
+                style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink, width: 160 }} />
+            </div>
+          </div>
+
+          <div className="rounded-xl overflow-hidden flex-1 min-h-0" style={{ border: `1px solid ${T.line}` }}>
+            <div className="overflow-auto h-full">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10">
+                  <tr style={{ background: T.ink }}>
+                    <th className="px-3 py-2.5 text-left" style={{ width: 36 }}>
+                      <input type="checkbox" checked={allChecked} onChange={toggleAll} className="w-4 h-4 cursor-pointer" />
+                    </th>
+                    <th className="px-3 py-2.5 text-left text-[11px] track uppercase font-semibold" style={{ color: "#C7CEDC" }}>Staff</th>
+                    <th className="px-3 py-2.5 text-right text-[11px] track uppercase font-semibold" style={{ color: T.amber }}>Rate (Rs.)</th>
+                    <th className="px-3 py-2.5 text-right text-[11px] track uppercase font-semibold" style={{ color: "#C7CEDC" }}>Food (Rs.)</th>
+                    <th className="px-3 py-2.5 text-right text-[11px] track uppercase font-semibold" style={{ color: "#C7CEDC" }}>Advance (Rs.)</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                </thead>
+                <tbody>
+                  {visibleRows.map((r) => {
+                    const emp = empMap[r.empId];
+                    if (!emp) return null;
+                    return (
+                      <tr key={r.empId} style={{ borderTop: `1px solid ${T.lineSoft}`, background: r.checked ? T.amberBg : "transparent" }}>
+                        <td className="px-3 py-2">
+                          <input type="checkbox" checked={r.checked}
+                            onChange={(e) => setRow(r.empId, "checked", e.target.checked)}
+                            className="w-4 h-4 cursor-pointer" />
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="font-semibold text-[13px]" style={{ color: T.ink }}>{emp.name}</div>
+                            {(savedSet.has(r.empId) || alreadyLoggedSet.has(r.empId)) && r.checked && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                                style={{ background: T.redBg, color: T.red }}>Already punched!</span>
+                            )}
+                            {alreadyLoggedSet.has(r.empId) && !r.checked && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded"
+                                style={{ background: T.redBg, color: T.red }}>Duplicate</span>
+                            )}
+                          </div>
+                          <div className="text-[11px] num" style={{ color: T.slateSoft }}>{emp.empId}</div>
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <input type="number" inputMode="numeric" value={r.rate}
+                            onChange={(e) => setRow(r.empId, "rate", e.target.value)}
+                            disabled={!r.checked}
+                            className="w-24 rounded px-2 py-1 text-sm num text-right"
+                            style={{ background: r.checked ? T.paper : T.lineSoft, border: `1px solid ${r.checked ? T.amber : "transparent"}`, color: T.ink }} />
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <input type="number" inputMode="numeric" value={r.food}
+                            onChange={(e) => setRow(r.empId, "food", e.target.value)}
+                            disabled={!r.checked} placeholder="0"
+                            className="w-24 rounded px-2 py-1 text-sm num text-right"
+                            style={{ background: r.checked ? T.paper : T.lineSoft, border: `1px solid ${r.checked ? T.line : "transparent"}`, color: T.ink }} />
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <input type="number" inputMode="numeric" value={r.advance}
+                            onChange={(e) => setRow(r.empId, "advance", e.target.value)}
+                            disabled={!r.checked} placeholder="0"
+                            className="w-24 rounded px-2 py-1 text-sm num text-right"
+                            style={{ background: r.checked ? T.paper : T.lineSoft, border: `1px solid ${r.checked ? T.line : "transparent"}`, color: T.ink }} />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-      <div className="flex items-center justify-between">
-        <div className="text-[12px]" style={{ color: T.slateSoft }}>
-          {checked.length > 0 ? `${checked.length} staff selected` : "Select staff above"}
+          {/* Footer */}
+          <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: `1px solid ${T.line}` }}>
+            <div className="text-[12px]" style={{ color: T.slateSoft }}>
+              {checked.length > 0 ? `${checked.length} staff selected` : "Select staff above"}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={onClose} className="px-4 py-2.5 rounded-lg text-sm font-semibold"
+                style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.slate }}>Cancel</button>
+              <button disabled={!valid} onClick={save}
+                className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white"
+                style={{ background: valid ? T.ink : T.slateSoft }}>
+                Save {checked.length > 0 ? `${checked.length} trip${checked.length > 1 ? "s" : ""}` : "trips"}
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button onClick={onClose} className="px-4 py-2.5 rounded-lg text-sm font-semibold"
-            style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.slate }}>Cancel</button>
-          <button disabled={!valid} onClick={save}
-            className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white"
-            style={{ background: valid ? T.ink : T.slateSoft }}>
-            Save {checked.length > 0 ? `${checked.length} trip${checked.length > 1 ? "s" : ""}` : "trips"}
-          </button>
-        </div>
+
       </div>
     </Modal>
   );
@@ -2764,12 +2787,26 @@ function Payslip({ data, month, firm, onClose }) {
 /* ------------------------------------------------------------------ */
 /*  Modal shell                                                        */
 /* ------------------------------------------------------------------ */
-function Modal({ children, onClose, title, wide }) {
+function Modal({ children, onClose, title, wide, fullscreen }) {
   useEffect(() => {
     const h = (e) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
+
+  if (fullscreen) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col" style={{ background: T.card }}>
+        <div className="flex items-center justify-between px-5 py-4 shrink-0"
+          style={{ borderBottom: `1px solid ${T.line}` }}>
+          <h3 className="text-base font-extrabold" style={{ color: T.ink }}>{title}</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg" style={{ color: T.slate }}><X size={18} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{ background: "rgba(22,35,63,.45)" }} onClick={onClose}>
