@@ -1140,6 +1140,7 @@ function StaffModal({ emp, designations, setDesignations, onSave, onClose }) {
 /* ------------------------------------------------------------------ */
 function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) {
   const [adding, setAdding] = useState(false);
+  const [addingBatch, setAddingBatch] = useState(false);
   const [filterEmp, setFilterEmp] = useState("all");
 
   const empName = (id) => employees.find((e) => e.id === id)?.name || "—";
@@ -1150,6 +1151,7 @@ function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) 
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 
   const add = (trip) => { setTrips((prev) => [...prev, { ...trip, id: uid() }]); setAdding(false); };
+  const addBatch = (newTrips) => { setTrips((prev) => [...prev, ...newTrips.map((t) => ({ ...t, id: uid() }))]); setAddingBatch(false); };
   const remove = (id) => setTrips((prev) => prev.filter((t) => t.id !== id));
 
   const tripRows = monthTrips.map((t) => {
@@ -1174,6 +1176,11 @@ function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) 
             <option value="all">All staff</option>
             {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
+          <button onClick={() => setAddingBatch(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold"
+            style={{ background: T.amberBg, color: T.amberDk, border: `1px solid ${T.amber}` }}>
+            <Users size={15} /> Log batch
+          </button>
           <button onClick={() => setAdding(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold text-white"
             style={{ background: T.ink }}>
@@ -1221,6 +1228,7 @@ function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) 
       </div>
 
       {adding && <TripModal employees={employees} setEmployees={setEmployees} trains={trains} month={month} onSave={add} onClose={() => setAdding(false)} />}
+      {addingBatch && <BatchTripModal employees={employees} trains={trains} month={month} onSave={addBatch} onClose={() => setAddingBatch(false)} />}
     </div>
   );
 }
@@ -1416,6 +1424,156 @@ function TripModal({ employees, setEmployees, trains, month, onSave, onClose }) 
           onClick={() => onSave({ ...f, food: Number(f.food) || 0, advance: Number(f.advance) || 0, rate: Number(f.rate) || 0 })}
           className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-white"
           style={{ background: valid ? T.ink : T.slateSoft }}>Save trip</button>
+      </div>
+    </Modal>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Batch trip modal                                                   */
+/* ------------------------------------------------------------------ */
+function BatchTripModal({ employees, trains, month, onSave, onClose }) {
+  const today = `${month}-${String(new Date().getDate()).padStart(2, "0")}`;
+  const [date, setDate] = useState(today);
+  const [trainNo, setTrainNo] = useState("");
+  const [route, setRoute] = useState("");
+  const activeEmps = employees.filter((e) => (e.status || "active") !== "inactive");
+  const [rows, setRows] = useState(() =>
+    activeEmps.map((e) => ({ empId: e.id, checked: false, rate: String(e.perTrip || ""), food: "", advance: "" }))
+  );
+  const empMap = Object.fromEntries(employees.map((e) => [e.id, e]));
+
+  const setRow = (empId, key, val) =>
+    setRows((prev) => prev.map((r) => (r.empId === empId ? { ...r, [key]: val } : r)));
+
+  const onPickTrain = (id) => {
+    const t = (trains || []).find((x) => x.id === id);
+    if (t) { setTrainNo(t.trainNo); setRoute(t.route || t.name || ""); }
+  };
+
+  const checked = rows.filter((r) => r.checked);
+  const valid = date && checked.length > 0;
+
+  const save = () => {
+    onSave(checked.map((r) => ({
+      empId: r.empId, date, trainNo, route,
+      rate: Number(r.rate) || 0,
+      food: Number(r.food) || 0,
+      advance: Number(r.advance) || 0,
+    })));
+  };
+
+  const allChecked = rows.every((r) => r.checked);
+  const toggleAll = () => setRows((prev) => prev.map((r) => ({ ...r, checked: !allChecked })));
+
+  return (
+    <Modal onClose={onClose} title="Log batch trips" wide>
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <label className="block">
+          <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Date</span>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+            className="mt-1 w-full rounded-lg px-3 py-2 text-sm num"
+            style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }} />
+        </label>
+        {trains && trains.length > 0 ? (
+          <label className="block">
+            <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Pick train</span>
+            <select onChange={(e) => onPickTrain(e.target.value)} defaultValue=""
+              className="mt-1 w-full rounded-lg px-3 py-2 text-sm"
+              style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }}>
+              <option value="" disabled>Select a train...</option>
+              {trains.map((t) => <option key={t.id} value={t.id}>{t.trainNo} - {t.name}</option>)}
+            </select>
+          </label>
+        ) : null}
+        <label className="block">
+          <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Train no.</span>
+          <input value={trainNo} onChange={(e) => setTrainNo(e.target.value)} placeholder="12030"
+            className="mt-1 w-full rounded-lg px-3 py-2 text-sm"
+            style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }} />
+        </label>
+        <label className="block">
+          <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Route</span>
+          <input value={route} onChange={(e) => setRoute(e.target.value)} placeholder="ASR - NDLS"
+            className="mt-1 w-full rounded-lg px-3 py-2 text-sm"
+            style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }} />
+        </label>
+      </div>
+
+      <div className="text-[11px] track uppercase font-semibold mb-1.5" style={{ color: T.slateSoft }}>
+        Select staff for this trip
+      </div>
+      <div className="rounded-xl overflow-hidden mb-4" style={{ border: `1px solid ${T.line}` }}>
+        <div className="overflow-x-auto" style={{ maxHeight: 300, overflowY: "auto" }}>
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ background: T.ink }}>
+                <th className="px-3 py-2.5 text-left" style={{ width: 36 }}>
+                  <input type="checkbox" checked={allChecked} onChange={toggleAll} className="w-4 h-4 cursor-pointer" />
+                </th>
+                <th className="px-3 py-2.5 text-left text-[11px] track uppercase font-semibold" style={{ color: "#C7CEDC" }}>Staff</th>
+                <th className="px-3 py-2.5 text-right text-[11px] track uppercase font-semibold" style={{ color: T.amber }}>Rate (Rs.)</th>
+                <th className="px-3 py-2.5 text-right text-[11px] track uppercase font-semibold" style={{ color: "#C7CEDC" }}>Food (Rs.)</th>
+                <th className="px-3 py-2.5 text-right text-[11px] track uppercase font-semibold" style={{ color: "#C7CEDC" }}>Advance (Rs.)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const emp = empMap[r.empId];
+                if (!emp) return null;
+                return (
+                  <tr key={r.empId} style={{ borderTop: `1px solid ${T.lineSoft}`, background: r.checked ? T.amberBg : "transparent" }}>
+                    <td className="px-3 py-2">
+                      <input type="checkbox" checked={r.checked}
+                        onChange={(e) => setRow(r.empId, "checked", e.target.checked)}
+                        className="w-4 h-4 cursor-pointer" />
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="font-semibold text-[13px]" style={{ color: T.ink }}>{emp.name}</div>
+                      <div className="text-[11px] num" style={{ color: T.slateSoft }}>{emp.empId}</div>
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <input type="number" inputMode="numeric" value={r.rate}
+                        onChange={(e) => setRow(r.empId, "rate", e.target.value)}
+                        disabled={!r.checked}
+                        className="w-20 rounded px-2 py-1 text-sm num text-right"
+                        style={{ background: r.checked ? T.paper : T.lineSoft, border: `1px solid ${r.checked ? T.amber : "transparent"}`, color: T.ink }} />
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <input type="number" inputMode="numeric" value={r.food}
+                        onChange={(e) => setRow(r.empId, "food", e.target.value)}
+                        disabled={!r.checked} placeholder="0"
+                        className="w-20 rounded px-2 py-1 text-sm num text-right"
+                        style={{ background: r.checked ? T.paper : T.lineSoft, border: `1px solid ${r.checked ? T.line : "transparent"}`, color: T.ink }} />
+                    </td>
+                    <td className="px-3 py-1.5">
+                      <input type="number" inputMode="numeric" value={r.advance}
+                        onChange={(e) => setRow(r.empId, "advance", e.target.value)}
+                        disabled={!r.checked} placeholder="0"
+                        className="w-20 rounded px-2 py-1 text-sm num text-right"
+                        style={{ background: r.checked ? T.paper : T.lineSoft, border: `1px solid ${r.checked ? T.line : "transparent"}`, color: T.ink }} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div className="text-[12px]" style={{ color: T.slateSoft }}>
+          {checked.length > 0 ? `${checked.length} staff selected` : "Select staff above"}
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onClose} className="px-4 py-2.5 rounded-lg text-sm font-semibold"
+            style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.slate }}>Cancel</button>
+          <button disabled={!valid} onClick={save}
+            className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white"
+            style={{ background: valid ? T.ink : T.slateSoft }}>
+            Save {checked.length > 0 ? `${checked.length} trip${checked.length > 1 ? "s" : ""}` : "trips"}
+          </button>
+        </div>
       </div>
     </Modal>
   );
