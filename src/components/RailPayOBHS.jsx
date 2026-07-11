@@ -284,7 +284,7 @@ export default function App({ onLogout }) {
     { id: "dashboard", label: "Dashboard", icon: LayoutGrid },
     { id: "employees", label: "Staff", icon: Users },
     { id: "trips", label: "Trip Log", icon: Route },
-    { id: "planning", label: "Planning", icon: ClipboardList },
+    { id: "planning", label: "Train Logs", icon: ClipboardList },
     { id: "hours", label: "Hours & Penalty", icon: AlertTriangle },
     { id: "salary", label: "Salary Sheet", icon: ReceiptIndianRupee },
   ];
