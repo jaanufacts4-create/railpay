@@ -1,8 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
-
 export async function middleware(request) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -28,31 +26,17 @@ export async function middleware(request) {
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
 
-  // /admin — sirf admin email access kar sakti hai
-  if (path.startsWith('/admin')) {
-    if (!user) {
-      const url = request.nextUrl.clone();
-      url.pathname = '/login';
-      return NextResponse.redirect(url);
-    }
-    if (user.email !== ADMIN_EMAIL) {
-      const url = request.nextUrl.clone();
-      url.pathname = '/dashboard';
-      return NextResponse.redirect(url);
-    }
-  }
-
-  // /dashboard — login hona chahiye
-  if (!user && path.startsWith('/dashboard')) {
+  // /admin aur /dashboard — login hona chahiye
+  if (!user && (path.startsWith('/dashboard') || path.startsWith('/admin'))) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
   }
 
-  // Login/register page — agar already logged in hai toh redirect
+  // Login/register page — agar logged in hai toh dashboard pe bhejo
   if (user && (path === '/login' || path === '/register')) {
     const url = request.nextUrl.clone();
-    url.pathname = user.email === ADMIN_EMAIL ? '/admin' : '/dashboard';
+    url.pathname = '/dashboard';
     return NextResponse.redirect(url);
   }
 
