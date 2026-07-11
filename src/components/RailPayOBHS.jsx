@@ -1151,7 +1151,7 @@ function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) 
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 
   const add = (trip) => { setTrips((prev) => [...prev, { ...trip, id: uid() }]); setAdding(false); };
-  const addBatch = (newTrips) => { setTrips((prev) => [...prev, ...newTrips.map((t) => ({ ...t, id: uid() }))]); setAddingBatch(false); };
+  const addBatch = (newTrips) => { setTrips((prev) => [...prev, ...newTrips.map((t) => ({ ...t, id: uid() }))]); };
   const remove = (id) => setTrips((prev) => prev.filter((t) => t.id !== id));
 
   const tripRows = monthTrips.map((t) => {
@@ -1201,10 +1201,13 @@ function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) 
               </tr>
             </thead>
             <tbody>
-              {tripRows.map(({ t, rate }) => (
+              {tripRows.map(({ t, emp, rate }) => (
                 <tr key={t.id} className="rowhover" style={{ borderTop: "1px solid " + T.lineSoft }}>
                   <td className="px-4 py-3 num text-[13px]" style={{ color: T.slate }}>{t.date.slice(8)}/{t.date.slice(5, 7)}</td>
-                  <td className="px-4 py-3 font-semibold" style={{ color: T.ink }}>{empName(t.empId)}</td>
+                  <td className="px-4 py-3">
+                    <div className="font-semibold" style={{ color: T.ink }}>{emp?.name || empName(t.empId)}</div>
+                    <div className="text-[11px] num" style={{ color: T.slateSoft }}>{emp?.empId || ""}</div>
+                  </td>
                   <td className="px-4 py-3 num text-[13px]" style={{ color: T.slate }}>{t.trainNo}</td>
                   <td className="px-4 py-3 text-[13px]" style={{ color: T.slate }}>{t.route}</td>
                   <td className="px-4 py-3 num text-right font-semibold" style={{ color: T.ink }}>{money(rate)}</td>
@@ -1228,7 +1231,7 @@ function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) 
       </div>
 
       {adding && <TripModal employees={employees} setEmployees={setEmployees} trains={trains} month={month} onSave={add} onClose={() => setAdding(false)} />}
-      {addingBatch && <BatchTripModal employees={employees} trains={trains} month={month} onSave={addBatch} onClose={() => setAddingBatch(false)} />}
+      {addingBatch && <BatchTripModal employees={employees} trains={trains} month={month} onAddTrips={addBatch} onClose={() => setAddingBatch(false)} />}
     </div>
   );
 }
@@ -1432,17 +1435,19 @@ function TripModal({ employees, setEmployees, trains, month, onSave, onClose }) 
 /* ------------------------------------------------------------------ */
 /*  Batch trip modal                                                   */
 /* ------------------------------------------------------------------ */
-function BatchTripModal({ employees, trains, month, onSave, onClose }) {
+function BatchTripModal({ employees, trains, month, onAddTrips, onClose }) {
   const today = `${month}-${String(new Date().getDate()).padStart(2, "0")}`;
   const [date, setDate] = useState(today);
   const [trainNo, setTrainNo] = useState("");
   const [route, setRoute] = useState("");
   const [staffQ, setStaffQ] = useState("");
+  const [savedEmpIds, setSavedEmpIds] = useState([]);
   const activeEmps = employees.filter((e) => (e.status || "active") !== "inactive");
   const [rows, setRows] = useState(() =>
     activeEmps.map((e) => ({ empId: e.id, checked: false, rate: String(e.perTrip || ""), food: "", advance: "" }))
   );
   const empMap = Object.fromEntries(employees.map((e) => [e.id, e]));
+  const savedSet = new Set(savedEmpIds);
 
   const setRow = (empId, key, val) =>
     setRows((prev) => prev.map((r) => (r.empId === empId ? { ...r, [key]: val } : r)));
@@ -1462,12 +1467,17 @@ function BatchTripModal({ employees, trains, month, onSave, onClose }) {
   const valid = date && checked.length > 0;
 
   const save = () => {
-    onSave(checked.map((r) => ({
+    const justSaved = checked.map((r) => r.empId);
+    onAddTrips(checked.map((r) => ({
       empId: r.empId, date, trainNo, route,
       rate: Number(r.rate) || 0,
       food: Number(r.food) || 0,
       advance: Number(r.advance) || 0,
     })));
+    setSavedEmpIds((prev) => [...new Set([...prev, ...justSaved])]);
+    setRows((prev) => prev.map((r) =>
+      justSaved.includes(r.empId) ? { ...r, checked: false, food: "", advance: "" } : r
+    ));
   };
 
   const visibleIds = new Set(visibleRows.map((r) => r.empId));
@@ -1476,6 +1486,24 @@ function BatchTripModal({ employees, trains, month, onSave, onClose }) {
 
   return (
     <Modal onClose={onClose} title="Log batch trips" wide>
+      {savedEmpIds.length > 0 && (
+        <div className="rounded-xl px-4 py-3 mb-4" style={{ background: T.greenBg, border: `1px solid ${T.green}` }}>
+          <div className="text-[11px] track uppercase font-semibold mb-2" style={{ color: T.green }}>
+            Punched — {savedEmpIds.length} saved
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {savedEmpIds.map((id) => {
+              const emp = empMap[id];
+              return (
+                <span key={id} className="px-2 py-1 rounded-lg text-[11px] font-semibold num"
+                  style={{ background: T.green, color: "#fff" }}>
+                  {emp?.name} ({emp?.empId})
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3 mb-4">
         <label className="block">
           <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Date</span>
@@ -1546,7 +1574,13 @@ function BatchTripModal({ employees, trains, month, onSave, onClose }) {
                         className="w-4 h-4 cursor-pointer" />
                     </td>
                     <td className="px-3 py-2">
-                      <div className="font-semibold text-[13px]" style={{ color: T.ink }}>{emp.name}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="font-semibold text-[13px]" style={{ color: T.ink }}>{emp.name}</div>
+                        {savedSet.has(r.empId) && r.checked && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                            style={{ background: T.redBg, color: T.red }}>Already punched!</span>
+                        )}
+                      </div>
                       <div className="text-[11px] num" style={{ color: T.slateSoft }}>{emp.empId}</div>
                     </td>
                     <td className="px-3 py-1.5">
