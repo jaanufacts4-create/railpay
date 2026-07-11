@@ -1437,6 +1437,7 @@ function BatchTripModal({ employees, trains, month, onSave, onClose }) {
   const [date, setDate] = useState(today);
   const [trainNo, setTrainNo] = useState("");
   const [route, setRoute] = useState("");
+  const [staffQ, setStaffQ] = useState("");
   const activeEmps = employees.filter((e) => (e.status || "active") !== "inactive");
   const [rows, setRows] = useState(() =>
     activeEmps.map((e) => ({ empId: e.id, checked: false, rate: String(e.perTrip || ""), food: "", advance: "" }))
@@ -1451,6 +1452,12 @@ function BatchTripModal({ employees, trains, month, onSave, onClose }) {
     if (t) { setTrainNo(t.trainNo); setRoute(t.route || t.name || ""); }
   };
 
+  const visibleRows = staffQ.trim()
+    ? rows.filter((r) => {
+        const emp = empMap[r.empId];
+        return emp && (emp.name + " " + emp.empId).toLowerCase().includes(staffQ.toLowerCase());
+      })
+    : rows;
   const checked = rows.filter((r) => r.checked);
   const valid = date && checked.length > 0;
 
@@ -1463,8 +1470,9 @@ function BatchTripModal({ employees, trains, month, onSave, onClose }) {
     })));
   };
 
-  const allChecked = rows.every((r) => r.checked);
-  const toggleAll = () => setRows((prev) => prev.map((r) => ({ ...r, checked: !allChecked })));
+  const visibleIds = new Set(visibleRows.map((r) => r.empId));
+  const allChecked = visibleRows.length > 0 && visibleRows.every((r) => r.checked);
+  const toggleAll = () => setRows((prev) => prev.map((r) => visibleIds.has(r.empId) ? { ...r, checked: !allChecked } : r));
 
   return (
     <Modal onClose={onClose} title="Log batch trips" wide>
@@ -1500,8 +1508,17 @@ function BatchTripModal({ employees, trains, month, onSave, onClose }) {
         </label>
       </div>
 
-      <div className="text-[11px] track uppercase font-semibold mb-1.5" style={{ color: T.slateSoft }}>
-        Select staff for this trip
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>
+          Select staff for this trip
+        </div>
+        <div className="relative">
+          <Search size={13} style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", color: T.slateSoft }} />
+          <input value={staffQ} onChange={(e) => setStaffQ(e.target.value)}
+            placeholder="Search staff..."
+            className="rounded-lg pl-7 pr-3 py-1.5 text-[12px]"
+            style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink, width: 160 }} />
+        </div>
       </div>
       <div className="rounded-xl overflow-hidden mb-4" style={{ border: `1px solid ${T.line}` }}>
         <div className="overflow-x-auto" style={{ maxHeight: 300, overflowY: "auto" }}>
@@ -1518,7 +1535,7 @@ function BatchTripModal({ employees, trains, month, onSave, onClose }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => {
+              {visibleRows.map((r) => {
                 const emp = empMap[r.empId];
                 if (!emp) return null;
                 return (
