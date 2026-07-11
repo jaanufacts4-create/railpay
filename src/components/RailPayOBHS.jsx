@@ -636,9 +636,11 @@ function EmpTripsModal({ emps, trips, onClose }) {
       row["Date"] = t.date;
       row["Train No"] = t.trainNo || "";
       row["Route"] = t.route || "";
-      row["Food (₹)"] = Number(t.food) || 0;
-      row["Advance (₹)"] = Number(t.advance) || 0;
-      row["Per Trip (₹)"] = Number(t.rate) || Number(emp?.perTrip) || 0;
+      const tripRate = Number(t.rate) || Number(emp?.perTrip) || 0;
+      row["Rate (₹)"] = tripRate;
+      row["Food Deduction (₹)"] = Number(t.food) || 0;
+      row["Advance Deduction (₹)"] = Number(t.advance) || 0;
+      row["Net Trip Earning (₹)"] = tripRate - (Number(t.food) || 0) - (Number(t.advance) || 0);
       return row;
     });
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -653,8 +655,8 @@ function EmpTripsModal({ emps, trips, onClose }) {
     : `${emps[0].empId} · ${emps[0].designation} · ${money(emps[0].perTrip)}/trip`;
 
   const cols = multiEmp
-    ? ["Employee", "Date", "Train", "Route", "Food", "Advance"]
-    : ["Date", "Train", "Route", "Food", "Advance"];
+    ? ["Employee", "Date", "Train", "Route", "Rate", "Food (−)", "Advance (−)"]
+    : ["Date", "Train", "Route", "Rate", "Food (−)", "Advance (−)"];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -734,7 +736,8 @@ function EmpTripsModal({ emps, trips, onClose }) {
                     </td>
                     <td className="px-4 py-2.5 num text-[13px]" style={{ color: T.slate }}>{t.trainNo || "—"}</td>
                     <td className="px-4 py-2.5 text-[13px]" style={{ color: T.slate }}>{t.route || "—"}</td>
-                    <td className="px-4 py-2.5 num text-right" style={{ color: T.green }}>{t.food ? "+" + money(t.food) : "—"}</td>
+                    <td className="px-4 py-2.5 num text-right font-semibold" style={{ color: T.ink }}>{money(Number(t.rate) || Number(emp?.perTrip) || 0)}</td>
+                    <td className="px-4 py-2.5 num text-right" style={{ color: t.food ? T.red : T.slateSoft }}>{t.food ? "−" + money(t.food) : "—"}</td>
                     <td className="px-4 py-2.5 num text-right" style={{ color: t.advance ? T.red : T.slateSoft }}>{t.advance ? "−" + money(t.advance) : "—"}</td>
                   </tr>
                 );
@@ -1174,28 +1177,33 @@ function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) 
           <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr style={{ background: T.lineSoft }}>
-                {["Date", "Staff", "Train", "Route", "Food", "Advance", ""].map((h, i) => (
-                  <th key={h + i} className={`px-4 py-2.5 text-[11px] track uppercase font-semibold ${i >= 4 && i <= 5 ? "text-right" : "text-left"}`}
+                {["Date", "Staff", "Train", "Route", "Rate", "Food (−)", "Advance (−)", ""].map((h, i) => (
+                  <th key={h + i} className={`px-4 py-2.5 text-[11px] track uppercase font-semibold ${i >= 4 ? "text-right" : "text-left"}`}
                     style={{ color: T.slateSoft }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {monthTrips.map((t) => (
+              {monthTrips.map((t) => {
+                const emp = employees.find((e) => e.id === t.empId);
+                const tripRate = Number(t.rate) || Number(emp?.perTrip) || 0;
+                return (
                 <tr key={t.id} className="rowhover" style={{ borderTop: `1px solid ${T.lineSoft}` }}>
                   <td className="px-4 py-3 num text-[13px]" style={{ color: T.slate }}>{t.date.slice(8)}/{t.date.slice(5, 7)}</td>
                   <td className="px-4 py-3 font-semibold" style={{ color: T.ink }}>{empName(t.empId)}</td>
                   <td className="px-4 py-3 num text-[13px]" style={{ color: T.slate }}>{t.trainNo}</td>
                   <td className="px-4 py-3 text-[13px]" style={{ color: T.slate }}>{t.route}</td>
-                  <td className="px-4 py-3 num text-right" style={{ color: T.green }}>{t.food ? "+" + money(t.food) : "—"}</td>
+                  <td className="px-4 py-3 num text-right font-semibold" style={{ color: T.ink }}>{money(tripRate)}</td>
+                  <td className="px-4 py-3 num text-right" style={{ color: t.food ? T.red : T.slateSoft }}>{t.food ? "−" + money(t.food) : "—"}</td>
                   <td className="px-4 py-3 num text-right" style={{ color: t.advance ? T.red : T.slateSoft }}>{t.advance ? "−" + money(t.advance) : "—"}</td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={() => remove(t.id)} className="p-1.5" style={{ color: T.red }}><Trash2 size={15} /></button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {monthTrips.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: T.slateSoft }}>
+                <tr><td colSpan={8} className=”px-4 py-8 text-center text-sm” style={{ color: T.slateSoft }}>
                   No trips logged. Tap “Log trip” to add the first one.
                 </td></tr>
               )}
@@ -2237,16 +2245,15 @@ function SalaryView({ rows, totals, month, firm, onPayslip }) {
       "Name": r.emp.name,
       "Designation": r.emp.designation,
       "Trips": r.count,
-      "Per Trip": r.emp.perTrip,
-      "Gross Salary": r.gross,
-      "Food Money": r.food,
-      "Advance": r.advance,
-      "Net Payable": r.net,
+      "Gross Salary (₹)": r.gross,
+      "Food Deduction (₹)": r.food,
+      "Advance Deduction (₹)": r.advance,
+      "Net Payable (₹)": r.net,
     }));
     data.push({
       "Emp ID": "", "Name": "TOTAL", "Designation": "", "Trips": totals.count,
-      "Per Trip": "", "Gross Salary": totals.gross, "Food Money": totals.food,
-      "Advance": totals.advance, "Net Payable": totals.net,
+      "Gross Salary (₹)": totals.gross, "Food Deduction (₹)": totals.food,
+      "Advance Deduction (₹)": totals.advance, "Net Payable (₹)": totals.net,
     });
     const ws = XLSX.utils.aoa_to_sheet([
       [firm?.name || "OBHS Contractor"],
@@ -2289,7 +2296,11 @@ function SalaryView({ rows, totals, month, firm, onPayslip }) {
                 <tr key={r.emp.id} className="rowhover" style={{ borderTop: `1px solid ${T.lineSoft}` }}>
                   <td className="px-4 py-3">
                     <div className="font-semibold" style={{ color: T.ink }}>{r.emp.name}</div>
-                    <div className="text-[11px] num" style={{ color: T.slateSoft }}>{r.emp.empId} · {money(r.emp.perTrip)}/trip</div>
+                    <div className="text-[11px] num" style={{ color: T.slateSoft }}>
+                      {r.emp.empId} · {r.trips.length > 0 && r.trips.some((t) => t.rate && Number(t.rate) !== Number(r.emp.perTrip))
+                        ? "Variable rate"
+                        : money(r.emp.perTrip) + "/trip"}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-right num" style={{ color: T.slate }}>{r.count}</td>
                   <td className="px-4 py-3 text-right num" style={{ color: T.ink }}>{money(r.gross)}</td>
