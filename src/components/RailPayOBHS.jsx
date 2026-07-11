@@ -603,12 +603,136 @@ function Dashboard({ rows, totals, month, staffCount, activeCount, onOpen }) {
 }
 
 /* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ */
+/*  Employee Trip History Modal                                        */
+/* ------------------------------------------------------------------ */
+function EmpTripsModal({ emp, trips, onClose }) {
+  const [filterType, setFilterType] = useState("month"); // "month" | "range"
+  const [month, setMonth] = useState(curMonth());
+  const [from, setFrom] = useState(curMonth() + "-01");
+  const [to, setTo] = useState(todayISO());
+
+  const filtered = trips.filter((t) => {
+    if (!t.date) return false;
+    if (t.empId !== emp.id) return false;
+    if (filterType === "month") return t.date.startsWith(month);
+    return t.date >= from && t.date <= to;
+  }).sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  const totalFood = filtered.reduce((s, t) => s + (Number(t.food) || 0), 0);
+  const totalAdv = filtered.reduce((s, t) => s + (Number(t.advance) || 0), 0);
+  const gross = filtered.length * (Number(emp.perTrip) || 0);
+  const net = gross + totalFood - totalAdv;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(22,35,63,0.5)" }}>
+      <div className="w-full max-w-2xl rounded-2xl flex flex-col" style={{ background: T.card, border: `1px solid ${T.line}`, maxHeight: "90vh" }}>
+        {/* Header */}
+        <div className="flex items-start justify-between px-5 pt-5 pb-4" style={{ borderBottom: `1px solid ${T.line}` }}>
+          <div>
+            <div className="font-extrabold text-base" style={{ color: T.ink }}>{emp.name}</div>
+            <div className="text-[12px] num mt-0.5" style={{ color: T.slateSoft }}>
+              {emp.empId} · {emp.designation} · {money(emp.perTrip)}/trip
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 mt-0.5" style={{ color: T.slateSoft }}><X size={18} /></button>
+        </div>
+
+        {/* Filter bar */}
+        <div className="px-5 py-3 flex flex-wrap gap-2 items-center" style={{ borderBottom: `1px solid ${T.lineSoft}` }}>
+          <div className="flex rounded-lg overflow-hidden" style={{ border: `1px solid ${T.line}` }}>
+            {["month", "range"].map((type) => (
+              <button key={type} onClick={() => setFilterType(type)}
+                className="px-3 py-1.5 text-[12px] font-semibold"
+                style={{ background: filterType === type ? T.ink : T.card, color: filterType === type ? T.amber : T.slate }}>
+                {type === "month" ? "Month" : "Date Range"}
+              </button>
+            ))}
+          </div>
+          {filterType === "month" ? (
+            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)}
+              className="rounded-lg px-3 py-1.5 text-sm"
+              style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }} />
+          ) : (
+            <div className="flex items-center gap-2">
+              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)}
+                className="rounded-lg px-3 py-1.5 text-sm"
+                style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }} />
+              <span className="text-[12px]" style={{ color: T.slateSoft }}>to</span>
+              <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
+                className="rounded-lg px-3 py-1.5 text-sm"
+                style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }} />
+            </div>
+          )}
+          <span className="text-[12px]" style={{ color: T.slateSoft }}>{filtered.length} trips</span>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-y-auto flex-1">
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ background: T.lineSoft }}>
+                {["Date", "Train", "Route", "Food", "Advance"].map((h, i) => (
+                  <th key={i} className={`px-4 py-2.5 text-[11px] track uppercase font-semibold ${i >= 3 ? "text-right" : "text-left"}`}
+                    style={{ color: T.slateSoft }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((t) => (
+                <tr key={t.id} className="rowhover" style={{ borderTop: `1px solid ${T.lineSoft}` }}>
+                  <td className="px-4 py-2.5 num text-[13px]" style={{ color: T.slate }}>
+                    {t.date.slice(8)}/{t.date.slice(5, 7)}/{t.date.slice(0, 4)}
+                  </td>
+                  <td className="px-4 py-2.5 num text-[13px]" style={{ color: T.slate }}>{t.trainNo || "—"}</td>
+                  <td className="px-4 py-2.5 text-[13px]" style={{ color: T.slate }}>{t.route || "—"}</td>
+                  <td className="px-4 py-2.5 num text-right" style={{ color: T.green }}>{t.food ? "+" + money(t.food) : "—"}</td>
+                  <td className="px-4 py-2.5 num text-right" style={{ color: t.advance ? T.red : T.slateSoft }}>{t.advance ? "−" + money(t.advance) : "—"}</td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-sm" style={{ color: T.slateSoft }}>
+                  No trips in this period.
+                </td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Summary footer */}
+        {filtered.length > 0 && (
+          <div className="px-5 py-3 flex flex-wrap gap-4 items-center" style={{ borderTop: `1px solid ${T.line}`, background: T.lineSoft }}>
+            <div className="text-[12px]" style={{ color: T.slateSoft }}>
+              <span className="font-semibold num" style={{ color: T.ink }}>{filtered.length}</span> trips ×{" "}
+              <span className="num" style={{ color: T.ink }}>{money(emp.perTrip)}</span>
+              {" = "}
+              <span className="font-bold num" style={{ color: T.ink }}>{money(gross)}</span>
+            </div>
+            {totalFood > 0 && (
+              <div className="text-[12px]" style={{ color: T.green }}>+Food {money(totalFood)}</div>
+            )}
+            {totalAdv > 0 && (
+              <div className="text-[12px]" style={{ color: T.red }}>−Adv {money(totalAdv)}</div>
+            )}
+            <div className="ml-auto font-extrabold num text-sm" style={{ color: T.ink }}>
+              Net {money(net)}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Staff                                                              */
 /* ------------------------------------------------------------------ */
 function StaffView({ employees, setEmployees, trips, setTrips, designations, setDesignations }) {
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [editing, setEditing] = useState(null); // employee object or {} for new
+  const [viewTripsEmp, setViewTripsEmp] = useState(null); // employee to show trips for
   const [importMsg, setImportMsg] = useState("");
   const fileRef = useRef(null);
 
@@ -749,7 +873,13 @@ function StaffView({ employees, setEmployees, trips, setTrips, designations, set
                 const inactive = (e.status || "active") === "inactive";
                 return (
                 <tr key={e.id} className="rowhover" style={{ borderTop: `1px solid ${T.lineSoft}`, opacity: inactive ? 0.7 : 1 }}>
-                  <td className="px-4 py-3 num text-[13px]" style={{ color: T.slate }}>{e.empId}</td>
+                  <td className="px-4 py-3 num text-[13px]">
+                    <button onClick={() => setViewTripsEmp(e)}
+                      className="underline underline-offset-2 font-semibold hover:opacity-70 transition-opacity"
+                      style={{ color: T.amber, textDecorationColor: T.amberBg }}>
+                      {e.empId || "—"}
+                    </button>
+                  </td>
                   <td className="px-4 py-3">
                     <div className="font-semibold" style={{ color: T.ink }}>{e.name}</div>
                     {e.remarks ? (
@@ -789,6 +919,7 @@ function StaffView({ employees, setEmployees, trips, setTrips, designations, set
 
       {editing && <StaffModal emp={editing} designations={designations}
         setDesignations={setDesignations} onSave={save} onClose={() => setEditing(null)} />}
+      {viewTripsEmp && <EmpTripsModal emp={viewTripsEmp} trips={trips} onClose={() => setViewTripsEmp(null)} />}
     </div>
   );
 }
