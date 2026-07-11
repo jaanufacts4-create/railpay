@@ -392,7 +392,7 @@ export default function App({ onLogout }) {
             designations={designations} setDesignations={setDesignations} />
         )}
         {view === "trips" && (
-          <TripsView employees={employees} trips={trips} setTrips={setTrips}
+          <TripsView employees={employees} setEmployees={setEmployees} trips={trips} setTrips={setTrips}
             trains={trains} month={month} />
         )}
         {view === "planning" && (
@@ -1133,7 +1133,7 @@ function StaffModal({ emp, designations, setDesignations, onSave, onClose }) {
 /* ------------------------------------------------------------------ */
 /*  Trips                                                              */
 /* ------------------------------------------------------------------ */
-function TripsView({ employees, trips, setTrips, trains, month }) {
+function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) {
   const [adding, setAdding] = useState(false);
   const [filterEmp, setFilterEmp] = useState("all");
 
@@ -1204,19 +1204,37 @@ function TripsView({ employees, trips, setTrips, trains, month }) {
         </div>
       </div>
 
-      {adding && <TripModal employees={employees} trains={trains} month={month} onSave={add} onClose={() => setAdding(false)} />}
+      {adding && <TripModal employees={employees} setEmployees={setEmployees} trains={trains} month={month} onSave={add} onClose={() => setAdding(false)} />}
     </div>
   );
 }
 
-function StaffPicker({ employees, value, onChange }) {
+function StaffPicker({ employees, setEmployees, value, onChange }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const [editRateId, setEditRateId] = useState(null); // emp.id being rate-edited
+  const [rateVal, setRateVal] = useState("");
   const selected = employees.find((e) => e.id === value);
   const list = employees.filter((e) =>
     (e.status || "active") !== "inactive" &&
     (e.name + " " + e.empId + " " + e.designation).toLowerCase().includes(q.toLowerCase())
   );
+
+  const startEditRate = (e, ev) => {
+    ev.stopPropagation();
+    setEditRateId(e.id);
+    setRateVal(String(e.perTrip || ""));
+  };
+
+  const saveRate = (empId, ev) => {
+    ev?.stopPropagation();
+    const newRate = Number(rateVal);
+    if (newRate > 0 && setEmployees) {
+      setEmployees((prev) => prev.map((e) => e.id === empId ? { ...e, perTrip: newRate } : e));
+    }
+    setEditRateId(null);
+  };
+
   return (
     <div className="mt-1">
       <button type="button" onClick={() => setOpen((o) => !o)}
@@ -1235,18 +1253,50 @@ function StaffPicker({ employees, value, onChange }) {
             <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or ID…"
               className="w-full bg-transparent text-sm" style={{ color: T.ink, border: "none" }} />
           </div>
-          <div className="overflow-y-auto" style={{ maxHeight: 180 }}>
+          <div className="overflow-y-auto" style={{ maxHeight: 220 }}>
             {list.map((e) => (
-              <button key={e.id} type="button"
-                onClick={() => { onChange(e.id); setOpen(false); setQ(""); }}
-                className="w-full text-left px-3 py-2.5 rowhover flex items-center justify-between"
-                style={{ background: e.id === value ? T.amberBg : "transparent" }}>
-                <span className="truncate">
-                  <span className="text-sm font-semibold" style={{ color: T.ink }}>{e.name}</span>
-                  <span className="text-[11px] num ml-2" style={{ color: T.slateSoft }}>{e.empId}</span>
-                </span>
-                <span className="num text-[12px] shrink-0 ml-2" style={{ color: T.slate }}>{money(e.perTrip)}</span>
-              </button>
+              <div key={e.id} className="rowhover"
+                style={{ background: e.id === value ? T.amberBg : "transparent", borderTop: `1px solid ${T.lineSoft}` }}>
+                {editRateId === e.id ? (
+                  /* ── inline rate editor ── */
+                  <div className="flex items-center gap-2 px-3 py-2" onClick={(ev) => ev.stopPropagation()}>
+                    <span className="text-sm font-semibold flex-1 truncate" style={{ color: T.ink }}>{e.name}</span>
+                    <span className="text-[11px]" style={{ color: T.slateSoft }}>₹</span>
+                    <input
+                      autoFocus
+                      type="number"
+                      value={rateVal}
+                      onChange={(ev) => setRateVal(ev.target.value)}
+                      onKeyDown={(ev) => { if (ev.key === "Enter") saveRate(e.id); if (ev.key === "Escape") setEditRateId(null); }}
+                      className="w-20 rounded px-2 py-0.5 text-sm num text-right"
+                      style={{ background: T.paper, border: `1px solid ${T.amber}`, color: T.ink }} />
+                    <button type="button" onClick={(ev) => saveRate(e.id, ev)}
+                      className="p-1 rounded font-bold text-[12px]"
+                      style={{ background: T.ink, color: "#fff" }}>✓</button>
+                    <button type="button" onClick={(ev) => { ev.stopPropagation(); setEditRateId(null); }}
+                      className="p-1 rounded text-[12px]"
+                      style={{ color: T.slateSoft }}>✕</button>
+                  </div>
+                ) : (
+                  /* ── normal row ── */
+                  <div className="flex items-center px-3 py-2.5">
+                    <button type="button" className="flex-1 text-left flex items-center gap-0 min-w-0"
+                      onClick={() => { onChange(e.id); setOpen(false); setQ(""); setEditRateId(null); }}>
+                      <span className="text-sm font-semibold truncate" style={{ color: T.ink }}>{e.name}</span>
+                      <span className="text-[11px] num ml-2 shrink-0" style={{ color: T.slateSoft }}>{e.empId}</span>
+                    </button>
+                    <span className="num text-[12px] shrink-0 ml-2" style={{ color: T.slate }}>{money(e.perTrip)}</span>
+                    {setEmployees && (
+                      <button type="button" onClick={(ev) => startEditRate(e, ev)}
+                        className="ml-2 p-1 rounded shrink-0 hover:opacity-70"
+                        title="Edit rate"
+                        style={{ color: T.slateSoft }}>
+                        <Pencil size={12} />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             ))}
             {list.length === 0 && (
               <div className="px-3 py-4 text-center text-sm" style={{ color: T.slateSoft }}>No staff found.</div>
@@ -1258,7 +1308,7 @@ function StaffPicker({ employees, value, onChange }) {
   );
 }
 
-function TripModal({ employees, trains, month, onSave, onClose }) {
+function TripModal({ employees, setEmployees, trains, month, onSave, onClose }) {
   const [f, setF] = useState({
     empId: employees[0]?.id || "", date: `${month}-${String(new Date().getDate()).padStart(2, "0")}`,
     trainNo: "", route: "", food: "", advance: "",
@@ -1276,7 +1326,7 @@ function TripModal({ employees, trains, month, onSave, onClose }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
           <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Staff</span>
-          <StaffPicker employees={employees} value={f.empId} onChange={(id) => set("empId", id)} />
+          <StaffPicker employees={employees} setEmployees={setEmployees} value={f.empId} onChange={(id) => set("empId", id)} />
         </div>
         {trains && trains.length > 0 && (
           <label className="block col-span-2">
