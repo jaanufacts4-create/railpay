@@ -1349,9 +1349,11 @@ function TripModal({ employees, setEmployees, trains, month, onSave, onClose }) 
     setF((p) => ({ ...p, empId: id, rate: String(emp?.perTrip || p.rate) }));
   };
 
+  const [selectedTrain, setSelectedTrain] = useState(null);
+
   const onPickTrain = (id) => {
     const t = (trains || []).find((x) => x.id === id);
-    if (t) setF((p) => ({ ...p, trainNo: t.trainNo, route: t.route || t.name }));
+    if (t) { setF((p) => ({ ...p, trainNo: t.trainNo, route: t.route || t.name })); setSelectedTrain(t); }
   };
 
   return (
@@ -1373,6 +1375,16 @@ function TripModal({ employees, setEmployees, trains, month, onSave, onClose }) 
               {trains.map((t) => <option key={t.id} value={t.id}>{t.trainNo} · {t.name}</option>)}
             </select>
           </label>
+        )}
+        {selectedTrain && (
+          <div className="col-span-2 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold"
+            style={{ background: T.amberBg, border: `1px solid ${T.amber}`, color: T.amberDk }}>
+            <span>Required Manpower: {selectedTrain.ehk + selectedTrain.janitors} total</span>
+            <span style={{ color: T.slateSoft, fontWeight: 400 }}>|</span>
+            <span>EHK — {String(selectedTrain.ehk).padStart(2, "0")}</span>
+            <span style={{ color: T.slateSoft, fontWeight: 400 }}>|</span>
+            <span>Janitors — {String(selectedTrain.janitors).padStart(2, "0")}</span>
+          </div>
         )}
         <label className="block">
           <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Date</span>
@@ -1441,6 +1453,7 @@ function BatchTripModal({ employees, trains, month, onAddTrips, onClose }) {
   const [trainNo, setTrainNo] = useState("");
   const [route, setRoute] = useState("");
   const [staffQ, setStaffQ] = useState("");
+  const [selectedTrain, setSelectedTrain] = useState(null);
   const [savedEmpIds, setSavedEmpIds] = useState([]);
   const activeEmps = employees.filter((e) => (e.status || "active") !== "inactive");
   const [rows, setRows] = useState(() =>
@@ -1454,7 +1467,7 @@ function BatchTripModal({ employees, trains, month, onAddTrips, onClose }) {
 
   const onPickTrain = (id) => {
     const t = (trains || []).find((x) => x.id === id);
-    if (t) { setTrainNo(t.trainNo); setRoute(t.route || t.name || ""); }
+    if (t) { setTrainNo(t.trainNo); setRoute(t.route || t.name || ""); setSelectedTrain(t); }
   };
 
   const visibleRows = staffQ.trim()
@@ -1522,6 +1535,16 @@ function BatchTripModal({ employees, trains, month, onAddTrips, onClose }) {
             </select>
           </label>
         ) : null}
+        {selectedTrain && (
+          <div className="col-span-2 flex flex-wrap items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold"
+            style={{ background: T.amberBg, border: `1px solid ${T.amber}`, color: T.amberDk }}>
+            <span>Required Manpower: {selectedTrain.ehk + selectedTrain.janitors} total</span>
+            <span style={{ color: T.slateSoft, fontWeight: 400 }}>|</span>
+            <span>EHK — {String(selectedTrain.ehk).padStart(2, "0")}</span>
+            <span style={{ color: T.slateSoft, fontWeight: 400 }}>|</span>
+            <span>Janitors — {String(selectedTrain.janitors).padStart(2, "0")}</span>
+          </div>
+        )}
         <label className="block">
           <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Train no.</span>
           <input value={trainNo} onChange={(e) => setTrainNo(e.target.value)} placeholder="12030"
