@@ -533,13 +533,15 @@ function Dashboard({ rows, totals, month, staffCount, activeCount, onOpen }) {
   const cards = [
     { label: "Staff on roll", value: staffCount, sub: `${activeCount} active · ${staffCount - activeCount} inactive`, icon: Users, tint: T.ink },
     { label: "Trips this month", value: totals.count, icon: Route, tint: T.ink },
-    { label: "Net payable", value: money(totals.net), icon: Wallet, tint: T.green },
+    { label: "Gross payable", value: money(totals.gross), icon: TrendingUp, tint: T.ink },
+    { label: "Food deductions", value: money(totals.food), icon: Utensils, tint: T.amber },
     { label: "Advance to recover", value: money(totals.advance), icon: ArrowDownCircle, tint: T.red },
+    { label: "Net payable", value: money(totals.net), icon: Wallet, tint: T.green },
   ];
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         {cards.map((c) => {
           const Icon = c.icon;
           return (
