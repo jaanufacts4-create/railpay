@@ -604,39 +604,77 @@ function Dashboard({ rows, totals, month, staffCount, activeCount, onOpen }) {
 
 /* ------------------------------------------------------------------ */
 /* ------------------------------------------------------------------ */
-/*  Employee Trip History Modal                                        */
+/*  Employee Trip History Modal  (single or multi-employee)           */
 /* ------------------------------------------------------------------ */
-function EmpTripsModal({ emp, trips, onClose }) {
-  const [filterType, setFilterType] = useState("month"); // "month" | "range"
+function EmpTripsModal({ emps, trips, onClose }) {
+  const multiEmp = emps.length > 1;
+  const [filterType, setFilterType] = useState("month");
   const [month, setMonth] = useState(curMonth());
   const [from, setFrom] = useState(curMonth() + "-01");
   const [to, setTo] = useState(todayISO());
 
+  const empMap = Object.fromEntries(emps.map((e) => [e.id, e]));
+  const empIdSet = new Set(emps.map((e) => e.id));
+
   const filtered = trips.filter((t) => {
     if (!t.date) return false;
-    if (t.empId !== emp.id) return false;
+    if (!empIdSet.has(t.empId)) return false;
     if (filterType === "month") return t.date.startsWith(month);
     return t.date >= from && t.date <= to;
   }).sort((a, b) => (a.date < b.date ? 1 : -1));
 
   const totalFood = filtered.reduce((s, t) => s + (Number(t.food) || 0), 0);
   const totalAdv = filtered.reduce((s, t) => s + (Number(t.advance) || 0), 0);
-  const gross = filtered.length * (Number(emp.perTrip) || 0);
+  const gross = filtered.reduce((s, t) => s + (Number(empMap[t.empId]?.perTrip) || 0), 0);
   const net = gross + totalFood - totalAdv;
+
+  function exportXLSX() {
+    const rows = filtered.map((t) => {
+      const emp = empMap[t.empId];
+      const row = {};
+      if (multiEmp) { row["Emp ID"] = emp?.empId || ""; row["Name"] = emp?.name || ""; }
+      row["Date"] = t.date;
+      row["Train No"] = t.trainNo || "";
+      row["Route"] = t.route || "";
+      row["Food (₹)"] = Number(t.food) || 0;
+      row["Advance (₹)"] = Number(t.advance) || 0;
+      row["Per Trip (₹)"] = Number(emp?.perTrip) || 0;
+      return row;
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Trips");
+    XLSX.writeFile(wb, multiEmp ? "trips_export.xlsx" : `trips_${emps[0].empId}.xlsx`);
+  }
+
+  const title = multiEmp ? `${emps.length} Employees Selected` : emps[0].name;
+  const subtitle = multiEmp
+    ? (() => { const ids = emps.map((e) => e.empId || e.name); return ids.length > 4 ? ids.slice(0, 4).join(", ") + ` +${ids.length - 4} more` : ids.join(", "); })()
+    : `${emps[0].empId} · ${emps[0].designation} · ${money(emps[0].perTrip)}/trip`;
+
+  const cols = multiEmp
+    ? ["Employee", "Date", "Train", "Route", "Food", "Advance"]
+    : ["Date", "Train", "Route", "Food", "Advance"];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(22,35,63,0.5)" }}>
-      <div className="w-full max-w-2xl rounded-2xl flex flex-col" style={{ background: T.card, border: `1px solid ${T.line}`, maxHeight: "90vh" }}>
+      <div className={`w-full ${multiEmp ? "max-w-3xl" : "max-w-2xl"} rounded-2xl flex flex-col`}
+        style={{ background: T.card, border: `1px solid ${T.line}`, maxHeight: "90vh" }}>
         {/* Header */}
         <div className="flex items-start justify-between px-5 pt-5 pb-4" style={{ borderBottom: `1px solid ${T.line}` }}>
           <div>
-            <div className="font-extrabold text-base" style={{ color: T.ink }}>{emp.name}</div>
-            <div className="text-[12px] num mt-0.5" style={{ color: T.slateSoft }}>
-              {emp.empId} · {emp.designation} · {money(emp.perTrip)}/trip
-            </div>
+            <div className="font-extrabold text-base" style={{ color: T.ink }}>{title}</div>
+            <div className="text-[12px] num mt-0.5" style={{ color: T.slateSoft }}>{subtitle}</div>
           </div>
-          <button onClick={onClose} className="p-1 mt-0.5" style={{ color: T.slateSoft }}><X size={18} /></button>
+          <div className="flex items-center gap-2 mt-0.5">
+            <button onClick={exportXLSX}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold"
+              style={{ background: T.ink, color: "#fff" }}>
+              <FileSpreadsheet size={13} /> Export Excel
+            </button>
+            <button onClick={onClose} className="p-1" style={{ color: T.slateSoft }}><X size={18} /></button>
+          </div>
         </div>
 
         {/* Filter bar */}
@@ -673,26 +711,36 @@ function EmpTripsModal({ emp, trips, onClose }) {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ background: T.lineSoft }}>
-                {["Date", "Train", "Route", "Food", "Advance"].map((h, i) => (
-                  <th key={i} className={`px-4 py-2.5 text-[11px] track uppercase font-semibold ${i >= 3 ? "text-right" : "text-left"}`}
+                {cols.map((h, i) => (
+                  <th key={i}
+                    className={`px-4 py-2.5 text-[11px] track uppercase font-semibold ${h === "Food" || h === "Advance" ? "text-right" : "text-left"}`}
                     style={{ color: T.slateSoft }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((t) => (
-                <tr key={t.id} className="rowhover" style={{ borderTop: `1px solid ${T.lineSoft}` }}>
-                  <td className="px-4 py-2.5 num text-[13px]" style={{ color: T.slate }}>
-                    {t.date.slice(8)}/{t.date.slice(5, 7)}/{t.date.slice(0, 4)}
-                  </td>
-                  <td className="px-4 py-2.5 num text-[13px]" style={{ color: T.slate }}>{t.trainNo || "—"}</td>
-                  <td className="px-4 py-2.5 text-[13px]" style={{ color: T.slate }}>{t.route || "—"}</td>
-                  <td className="px-4 py-2.5 num text-right" style={{ color: T.green }}>{t.food ? "+" + money(t.food) : "—"}</td>
-                  <td className="px-4 py-2.5 num text-right" style={{ color: t.advance ? T.red : T.slateSoft }}>{t.advance ? "−" + money(t.advance) : "—"}</td>
-                </tr>
-              ))}
+              {filtered.map((t) => {
+                const emp = empMap[t.empId];
+                return (
+                  <tr key={t.id} className="rowhover" style={{ borderTop: `1px solid ${T.lineSoft}` }}>
+                    {multiEmp && (
+                      <td className="px-4 py-2.5 text-[13px]">
+                        <div className="font-semibold" style={{ color: T.ink }}>{emp?.name || "—"}</div>
+                        <div className="text-[11px]" style={{ color: T.slateSoft }}>{emp?.empId || ""}</div>
+                      </td>
+                    )}
+                    <td className="px-4 py-2.5 num text-[13px]" style={{ color: T.slate }}>
+                      {t.date.slice(8)}/{t.date.slice(5, 7)}/{t.date.slice(0, 4)}
+                    </td>
+                    <td className="px-4 py-2.5 num text-[13px]" style={{ color: T.slate }}>{t.trainNo || "—"}</td>
+                    <td className="px-4 py-2.5 text-[13px]" style={{ color: T.slate }}>{t.route || "—"}</td>
+                    <td className="px-4 py-2.5 num text-right" style={{ color: T.green }}>{t.food ? "+" + money(t.food) : "—"}</td>
+                    <td className="px-4 py-2.5 num text-right" style={{ color: t.advance ? T.red : T.slateSoft }}>{t.advance ? "−" + money(t.advance) : "—"}</td>
+                  </tr>
+                );
+              })}
               {filtered.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-8 text-center text-sm" style={{ color: T.slateSoft }}>
+                <tr><td colSpan={cols.length} className="px-4 py-8 text-center text-sm" style={{ color: T.slateSoft }}>
                   No trips in this period.
                 </td></tr>
               )}
@@ -704,9 +752,7 @@ function EmpTripsModal({ emp, trips, onClose }) {
         {filtered.length > 0 && (
           <div className="px-5 py-3 flex flex-wrap gap-4 items-center" style={{ borderTop: `1px solid ${T.line}`, background: T.lineSoft }}>
             <div className="text-[12px]" style={{ color: T.slateSoft }}>
-              <span className="font-semibold num" style={{ color: T.ink }}>{filtered.length}</span> trips ×{" "}
-              <span className="num" style={{ color: T.ink }}>{money(emp.perTrip)}</span>
-              {" = "}
+              <span className="font-semibold num" style={{ color: T.ink }}>{filtered.length}</span> trips · Gross{" "}
               <span className="font-bold num" style={{ color: T.ink }}>{money(gross)}</span>
             </div>
             {totalFood > 0 && (
@@ -732,7 +778,8 @@ function StaffView({ employees, setEmployees, trips, setTrips, designations, set
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [editing, setEditing] = useState(null); // employee object or {} for new
-  const [viewTripsEmp, setViewTripsEmp] = useState(null); // employee to show trips for
+  const [viewTripsEmps, setViewTripsEmps] = useState(null); // array of employees to show trips for
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [importMsg, setImportMsg] = useState("");
   const fileRef = useRef(null);
 
@@ -826,6 +873,17 @@ function StaffView({ employees, setEmployees, trips, setTrips, designations, set
             style={{ background: T.card, border: `1px solid ${T.line}`, color: T.slate }}>
             <Upload size={15} /> Import Excel
           </button>
+          {selectedIds.size > 0 && (
+            <button
+              onClick={() => {
+                const sel = employees.filter((e) => selectedIds.has(e.id));
+                setViewTripsEmps(sel);
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold"
+              style={{ background: T.amber, color: "#fff" }}>
+              <FileSpreadsheet size={15} /> View Trips ({selectedIds.size})
+            </button>
+          )}
           <button onClick={() => setEditing({})}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold text-white"
             style={{ background: T.ink }}>
@@ -862,6 +920,19 @@ function StaffView({ employees, setEmployees, trips, setTrips, designations, set
           <table className="w-full text-sm" style={{ minWidth: 640 }}>
             <thead>
               <tr style={{ background: T.lineSoft }}>
+                <th className="pl-4 pr-1 py-2.5 w-8">
+                  <input type="checkbox"
+                    checked={filtered.length > 0 && filtered.every((e) => selectedIds.has(e.id))}
+                    onChange={(ev) => {
+                      setSelectedIds((prev) => {
+                        const next = new Set(prev);
+                        if (ev.target.checked) filtered.forEach((e) => next.add(e.id));
+                        else filtered.forEach((e) => next.delete(e.id));
+                        return next;
+                      });
+                    }}
+                    style={{ accentColor: T.amber }} />
+                </th>
                 {["Emp ID", "Name", "Designation", "Status", "Per Trip", "Phone", ""].map((h, i) => (
                   <th key={h + i} className="text-left px-4 py-2.5 text-[11px] track uppercase font-semibold"
                     style={{ color: T.slateSoft }}>{h}</th>
@@ -873,8 +944,20 @@ function StaffView({ employees, setEmployees, trips, setTrips, designations, set
                 const inactive = (e.status || "active") === "inactive";
                 return (
                 <tr key={e.id} className="rowhover" style={{ borderTop: `1px solid ${T.lineSoft}`, opacity: inactive ? 0.7 : 1 }}>
+                  <td className="pl-4 pr-1 py-3">
+                    <input type="checkbox"
+                      checked={selectedIds.has(e.id)}
+                      onChange={(ev) => {
+                        setSelectedIds((prev) => {
+                          const next = new Set(prev);
+                          ev.target.checked ? next.add(e.id) : next.delete(e.id);
+                          return next;
+                        });
+                      }}
+                      style={{ accentColor: T.amber }} />
+                  </td>
                   <td className="px-4 py-3 num text-[13px]">
-                    <button onClick={() => setViewTripsEmp(e)}
+                    <button onClick={() => setViewTripsEmps([e])}
                       className="underline underline-offset-2 font-semibold hover:opacity-70 transition-opacity"
                       style={{ color: T.amber, textDecorationColor: T.amberBg }}>
                       {e.empId || "—"}
@@ -908,7 +991,7 @@ function StaffView({ employees, setEmployees, trips, setTrips, designations, set
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-sm" style={{ color: T.slateSoft }}>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-sm" style={{ color: T.slateSoft }}>
                   No staff found.
                 </td></tr>
               )}
@@ -919,7 +1002,7 @@ function StaffView({ employees, setEmployees, trips, setTrips, designations, set
 
       {editing && <StaffModal emp={editing} designations={designations}
         setDesignations={setDesignations} onSave={save} onClose={() => setEditing(null)} />}
-      {viewTripsEmp && <EmpTripsModal emp={viewTripsEmp} trips={trips} onClose={() => setViewTripsEmp(null)} />}
+      {viewTripsEmps && <EmpTripsModal emps={viewTripsEmps} trips={trips} onClose={() => setViewTripsEmps(null)} />}
     </div>
   );
 }
