@@ -201,8 +201,8 @@ export default function AdminPage() {
 
   const downloadTemplate = () => {
     const ws = XLSX.utils.json_to_sheet([
-      { 'Emp ID': 'OBHS-201', 'Name': 'Amit Singh', 'Designation': 'Housekeeper', 'Per Trip': 650, 'Phone': '98xxxxxxxx' },
-      { 'Emp ID': 'OBHS-202', 'Name': 'Ravi Kumar', 'Designation': 'Cleaner', 'Per Trip': 550, 'Phone': '97xxxxxxxx' },
+      { 'Emp ID': 'OBHS-201', 'Name': 'Amit Singh', "Father's Name": 'Rajesh Singh', 'Designation': 'Housekeeper', 'Per Trip': 650, 'Phone': '98xxxxxxxx' },
+      { 'Emp ID': 'OBHS-202', 'Name': 'Ravi Kumar', "Father's Name": 'Suresh Kumar', 'Designation': 'Cleaner', 'Per Trip': 550, 'Phone': '97xxxxxxxx' },
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Staff');
@@ -525,7 +525,7 @@ export default function AdminPage() {
                       <table className="w-full text-sm">
                         <thead className="sticky top-0">
                           <tr style={{ background: T.ink }}>
-                            {['Emp ID', 'Name', 'Designation', 'Per Trip', 'Phone'].map((h) => (
+                            {["Emp ID", "Name", "Father's Name", "Designation", "Per Trip", "Phone"].map((h) => (
                               <th key={h} className="px-3 py-2.5 text-left text-[11px] tracking-widest uppercase font-semibold"
                                 style={{ color: '#C7CEDC' }}>{h}</th>
                             ))}
@@ -536,6 +536,7 @@ export default function AdminPage() {
                             <tr key={i} style={{ borderTop: `1px solid ${T.lineSoft}` }}>
                               <td className="px-3 py-2" style={{ color: T.slateSoft, fontFamily: 'monospace' }}>{r.empId || '—'}</td>
                               <td className="px-3 py-2 font-semibold" style={{ color: T.ink }}>{r.name}</td>
+                              <td className="px-3 py-2" style={{ color: T.slate }}>{r.fatherName || '—'}</td>
                               <td className="px-3 py-2" style={{ color: T.slate }}>{r.designation || '—'}</td>
                               <td className="px-3 py-2" style={{ color: T.amberDk, fontFamily: 'monospace' }}>₹{r.perTrip}</td>
                               <td className="px-3 py-2" style={{ color: T.slate }}>{r.phone || '—'}</td>
