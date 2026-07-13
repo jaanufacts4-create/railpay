@@ -1092,6 +1092,7 @@ function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) 
   const [adding, setAdding] = useState(false);
   const [addingBatch, setAddingBatch] = useState(false);
   const [filterEmp, setFilterEmp] = useState("all");
+  const [, startBatchTransition] = React.useTransition();
 
   const empName = (id) => employees.find((e) => e.id === id)?.name || "—";
 
@@ -1126,7 +1127,7 @@ function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) 
             <option value="all">All staff</option>
             {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
-          <button onClick={() => setAddingBatch(true)}
+          <button onClick={() => startBatchTransition(() => setAddingBatch(true))}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold"
             style={{ background: T.amberBg, color: T.amberDk, border: `1px solid ${T.amber}` }}>
             <Users size={15} /> Log batch
