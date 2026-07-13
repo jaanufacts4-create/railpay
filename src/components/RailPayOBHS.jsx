@@ -2327,6 +2327,19 @@ function HoursPenaltyView({ trains, employees, trips, month, rates, setRates, mi
   const [sub, setSub] = useState("hours");
   const [adding, setAdding] = useState(false);
 
+  // Planned hours from Train Logs (same logic as PlanningView projection)
+  const [py, pm] = month.split("-").map(Number);
+  const daysInMonth = new Date(py, pm, 0).getDate();
+  let plannedEhkHours = 0, plannedJanHours = 0;
+  for (let dd = 1; dd <= daysInMonth; dd++) {
+    const date = new Date(py, pm - 1, dd);
+    trains.filter((t) => runsOn(t, date)).forEach((t) => {
+      const hrs = Number(t.tripHours) || 0;
+      plannedEhkHours += (Number(t.ehk) || 0) * hrs;
+      plannedJanHours += (Number(t.janitors) || 0) * hrs;
+    });
+  }
+
   // hours from actual logged trips: staff role (EHK/Janitor) × the train's round-trip hours
   const hoursOfTrain = (trainNo) => Number((trains.find((t) => t.trainNo === trainNo) || {}).tripHours) || 0;
   const monthTrips = trips.filter((t) => t.date && t.date.startsWith(month));
@@ -2379,11 +2392,29 @@ function HoursPenaltyView({ trains, employees, trips, month, rates, setRates, mi
               <div className="text-[11px] track uppercase font-semibold" style={{ color: T.amberDk }}>EHK hours</div>
               <div className="text-2xl font-extrabold num mt-1" style={{ color: T.amberDk }}>{num2(ehkHours)}</div>
               <div className="text-[12px] num mt-0.5" style={{ color: T.slateSoft }}>{ehkTrips} trips</div>
+              <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${T.lineSoft}` }}>
+                <div className="text-[10px] track uppercase font-semibold mb-0.5" style={{ color: T.slateSoft }}>Planned</div>
+                <div className="text-sm font-bold num" style={{ color: T.amber }}>{num2(plannedEhkHours)} hrs</div>
+                <div className="text-[11px] num" style={{ color: ehkHours < plannedEhkHours ? T.red : T.green }}>
+                  {ehkHours < plannedEhkHours
+                    ? `▼ ${num2(plannedEhkHours - ehkHours)} short`
+                    : `✓ on target`}
+                </div>
+              </div>
             </div>
             <div className="rounded-xl p-4" style={{ background: T.card, border: `1px solid ${T.line}` }}>
               <div className="text-[11px] track uppercase font-semibold" style={{ color: T.green }}>Janitor hours</div>
               <div className="text-2xl font-extrabold num mt-1" style={{ color: T.green }}>{num2(janHours)}</div>
               <div className="text-[12px] num mt-0.5" style={{ color: T.slateSoft }}>{janTrips} trips</div>
+              <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${T.lineSoft}` }}>
+                <div className="text-[10px] track uppercase font-semibold mb-0.5" style={{ color: T.slateSoft }}>Planned</div>
+                <div className="text-sm font-bold num" style={{ color: T.green }}>{num2(plannedJanHours)} hrs</div>
+                <div className="text-[11px] num" style={{ color: janHours < plannedJanHours ? T.red : T.green }}>
+                  {janHours < plannedJanHours
+                    ? `▼ ${num2(plannedJanHours - janHours)} short`
+                    : `✓ on target`}
+                </div>
+              </div>
             </div>
           </div>
 
