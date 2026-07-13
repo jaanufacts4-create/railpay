@@ -1736,9 +1736,9 @@ function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose }
                     </th>
                     <th className="px-3 py-2.5 text-left text-[11px] track uppercase font-semibold" style={{ color: "#C7CEDC" }}>Staff</th>
                     <th className="px-3 py-2.5 text-left text-[11px] track uppercase font-semibold" style={{ color: "#C7CEDC" }}>Designation</th>
-                    <th className="px-1 py-2.5 text-right text-[11px] track uppercase font-semibold" style={{ color: T.amber }}>Rate (Rs.)</th>
-                    <th className="px-1 py-2.5 text-right text-[11px] track uppercase font-semibold" style={{ color: "#C7CEDC" }}>Food (Rs.)</th>
-                    <th className="px-1 py-2.5 text-right text-[11px] track uppercase font-semibold" style={{ color: "#C7CEDC" }}>Advance (Rs.)</th>
+                    <th className="px-1 py-2.5 text-right text-[11px] track uppercase font-semibold" style={{ color: T.amber, minWidth: 72 }}>Rate (Rs.)</th>
+                    <th className="px-1 py-2.5 text-right text-[11px] track uppercase font-semibold" style={{ color: "#C7CEDC", minWidth: 72 }}>Food (Rs.)</th>
+                    <th className="px-1 py-2.5 text-right text-[11px] track uppercase font-semibold" style={{ color: "#C7CEDC", minWidth: 72 }}>Advance (Rs.)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1769,21 +1769,21 @@ function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose }
                         <td className="px-3 py-2">
                           <div className="text-[12px]" style={{ color: T.slateSoft }}>{emp.designation || "—"}</div>
                         </td>
-                        <td className="px-1 py-1.5">
+                        <td className="px-1 py-1.5" style={{ minWidth: 72 }}>
                           <input type="number" inputMode="numeric" value={r.rate}
                             onChange={(e) => setRow(r.empId, "rate", e.target.value)}
                             disabled={!r.checked}
                             className="w-full rounded px-2 py-1 text-sm num text-right"
                             style={{ background: r.checked ? T.paper : T.lineSoft, border: `1px solid ${r.checked ? T.amber : "transparent"}`, color: T.ink }} />
                         </td>
-                        <td className="px-1 py-1.5">
+                        <td className="px-1 py-1.5" style={{ minWidth: 72 }}>
                           <input type="number" inputMode="numeric" value={r.food}
                             onChange={(e) => setRow(r.empId, "food", e.target.value)}
                             disabled={!r.checked} placeholder="0"
                             className="w-full rounded px-2 py-1 text-sm num text-right"
                             style={{ background: r.checked ? T.paper : T.lineSoft, border: `1px solid ${r.checked ? T.line : "transparent"}`, color: T.ink }} />
                         </td>
-                        <td className="px-1 py-1.5">
+                        <td className="px-1 py-1.5" style={{ minWidth: 72 }}>
                           <input type="number" inputMode="numeric" value={r.advance}
                             onChange={(e) => setRow(r.empId, "advance", e.target.value)}
                             disabled={!r.checked} placeholder="0"
