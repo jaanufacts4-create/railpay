@@ -1129,7 +1129,7 @@ function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) 
           </select>
           <button onClick={() => startBatchTransition(() => setAddingBatch(true))}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold"
-            style={{ background: T.amberBg, color: T.amberDk, border: `1px solid ${T.amber}` }}>
+            style={{ background: "rgba(57,255,20,0.15)", color: "#1A5E08", border: "1px solid #39FF14" }}>
             <Users size={15} /> Log batch
           </button>
           <button onClick={() => setAdding(true)}
@@ -1500,6 +1500,24 @@ function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose }
   const [staffQ, setStaffQ] = useState("");
   const [selectedTrain, setSelectedTrain] = useState(null);
   const [savedEmpIds, setSavedEmpIds] = useState([]);
+  const [nonRunningWarn, setNonRunningWarn] = useState(false);
+  const [leftOpen, setLeftOpen] = useState(true);
+  const nonRunningTimer = React.useRef(null);
+
+  const handleDateChange = (newDate) => {
+    setDate(newDate);
+    if (selectedTrain?.days?.length) {
+      const dow = new Date(newDate + "T00:00:00").getDay();
+      const runSet = new Set((selectedTrain.days).map((d) => DOW_MAP[d]));
+      if (!runSet.has(dow)) {
+        setNonRunningWarn(true);
+        clearTimeout(nonRunningTimer.current);
+        nonRunningTimer.current = setTimeout(() => setNonRunningWarn(false), 4000);
+      } else {
+        setNonRunningWarn(false);
+      }
+    }
+  };
   const activeEmps = employees.filter((e) => (e.status || "active") !== "inactive");
   const [rows, setRows] = useState(() =>
     activeEmps.map((e) => ({ empId: e.id, checked: false, rate: String(e.perTrip || ""), food: "", advance: "" }))
@@ -1520,7 +1538,18 @@ function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose }
 
   const onPickTrain = (id) => {
     const t = (trains || []).find((x) => x.id === id);
-    if (t) { setTrainNo(t.trainNo); setRoute(t.route || t.name || ""); setSelectedTrain(t); }
+    if (t) {
+      setTrainNo(t.trainNo); setRoute(t.route || t.name || ""); setSelectedTrain(t);
+      if (t.days?.length && date) {
+        const dow = new Date(date + "T00:00:00").getDay();
+        const runSet = new Set(t.days.map((d) => DOW_MAP[d]));
+        if (!runSet.has(dow)) {
+          setNonRunningWarn(true);
+          clearTimeout(nonRunningTimer.current);
+          nonRunningTimer.current = setTimeout(() => setNonRunningWarn(false), 4000);
+        }
+      }
+    }
   };
 
   const visibleRows = staffQ.trim()
@@ -1557,10 +1586,36 @@ function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose }
 
   return (
     <Modal onClose={onClose} title="Log batch trips" fullscreen>
+      {/* Non-running day toast */}
+      {nonRunningWarn && (
+        <div className="fixed top-16 left-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-semibold"
+          style={{ transform: "translateX(-50%)", background: "#1e1a00", border: "1.5px solid #f59e0b", color: "#fbbf24", whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 16 }}>⚠️</span>
+          Train is not running on this day
+          <button onClick={() => setNonRunningWarn(false)} className="ml-2 opacity-60 hover:opacity-100" style={{ fontSize: 14 }}>✕</button>
+        </div>
+      )}
+
       <div className="flex flex-col lg:flex-row gap-5 h-full">
 
         {/* ── LEFT COLUMN: date + train ── */}
-        <div className="lg:w-72 xl:w-80 shrink-0 space-y-3">
+        <div className="lg:w-72 xl:w-80 shrink-0">
+
+          {/* Mobile: compact summary bar + toggle */}
+          <div className="lg:hidden mb-3">
+            <button onClick={() => setLeftOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold"
+              style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }}>
+              <span className="flex items-center gap-2">
+                <span className="text-base">📅</span>
+                <span>{date}</span>
+                {selectedTrain && <span style={{ color: T.amber }}>· {selectedTrain.trainNo}</span>}
+              </span>
+              <span style={{ color: T.slateSoft, fontSize: 12 }}>{leftOpen ? "▲ Hide" : "▼ Edit"}</span>
+            </button>
+          </div>
+
+          <div className={`space-y-3 ${leftOpen ? "block" : "hidden"} lg:block`}>
 
           {/* Punched chips */}
           {savedEmpIds.length > 0 && (
@@ -1585,7 +1640,7 @@ function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose }
           {/* Calendar */}
           <div>
             <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Date</span>
-            <MiniCalendar value={date} onChange={setDate} maxDate={today} runningDays={selectedTrain?.days} />
+            <MiniCalendar value={date} onChange={handleDateChange} maxDate={today} runningDays={selectedTrain?.days} />
           </div>
 
           {/* Train picker */}
@@ -1627,6 +1682,17 @@ function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose }
                 className="mt-1 w-full rounded-lg px-3 py-2 text-sm"
                 style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.ink }} />
             </label>
+          </div>
+
+          {/* Mobile: collapse after selection */}
+          {selectedTrain && date && (
+            <button onClick={() => setLeftOpen(false)}
+              className="lg:hidden w-full py-2 rounded-lg text-sm font-semibold"
+              style={{ background: "rgba(57,255,20,0.15)", color: "#1A5E08", border: "1px solid #39FF14" }}>
+              ✓ Done — Show Staff List
+            </button>
+          )}
+
           </div>
         </div>
 
