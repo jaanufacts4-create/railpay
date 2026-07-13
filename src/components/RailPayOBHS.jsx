@@ -1411,16 +1411,18 @@ function MiniCalendar({ value, onChange, maxDate, runningDays }) {
   const [viewYear, setViewYear] = useState(init.getFullYear());
   const [viewMonth, setViewMonth] = useState(init.getMonth());
 
-  const maxD = parseDate(maxDate);
-  maxD.setHours(23, 59, 59);
-  const nowY = maxD.getFullYear(), nowM = maxD.getMonth();
+  const hasMax = !!maxDate;
+  const maxD = hasMax ? parseDate(maxDate) : null;
+  if (maxD) maxD.setHours(23, 59, 59);
+  const nowY = maxD ? maxD.getFullYear() : 9999;
+  const nowM = maxD ? maxD.getMonth() : 11;
 
   const prevMonth = () => {
     if (viewMonth === 0) { setViewYear((y) => y - 1); setViewMonth(11); }
     else setViewMonth((m) => m - 1);
   };
   const nextMonth = () => {
-    if (viewYear > nowY || (viewYear === nowY && viewMonth >= nowM)) return;
+    if (hasMax && (viewYear > nowY || (viewYear === nowY && viewMonth >= nowM))) return;
     if (viewMonth === 11) { setViewYear((y) => y + 1); setViewMonth(0); }
     else setViewMonth((m) => m + 1);
   };
@@ -1457,7 +1459,7 @@ function MiniCalendar({ value, onChange, maxDate, runningDays }) {
           const cellDate = new Date(viewYear, viewMonth, d);
           const dow = cellDate.getDay();
           const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-          const isFuture = cellDate > maxD;
+          const isFuture = hasMax && maxD && cellDate > maxD;
           const isRunning = !hasFilter || runSet.has(dow);
           const isSelected = value === dateStr;
 
@@ -1640,7 +1642,7 @@ function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose }
           {/* Calendar */}
           <div>
             <span className="text-[11px] track uppercase font-semibold" style={{ color: T.slateSoft }}>Date</span>
-            <MiniCalendar value={date} onChange={handleDateChange} maxDate={today} runningDays={selectedTrain?.days} />
+            <MiniCalendar value={date} onChange={handleDateChange} runningDays={selectedTrain?.days} />
           </div>
 
           {/* Train picker */}
