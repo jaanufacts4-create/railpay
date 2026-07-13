@@ -395,7 +395,7 @@ export default function App({ onLogout }) {
         )}
         {view === "trips" && (
           <TripsView employees={employees} setEmployees={setEmployees} trips={trips} setTrips={setTrips}
-            trains={trains} month={month} />
+            trains={trains} month={month} setPenalties={setPenalties} />
         )}
         {view === "planning" && (
           <PlanningView trains={trains} setTrains={setTrains}
@@ -1088,7 +1088,7 @@ function StaffModal({ emp, designations, setDesignations, onSave, onClose }) {
 /* ------------------------------------------------------------------ */
 /*  Trips                                                              */
 /* ------------------------------------------------------------------ */
-function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) {
+function TripsView({ employees, setEmployees, trips, setTrips, trains, month, setPenalties }) {
   const [adding, setAdding] = useState(false);
   const [addingBatch, setAddingBatch] = useState(false);
   const [filterEmp, setFilterEmp] = useState("all");
@@ -1182,7 +1182,7 @@ function TripsView({ employees, setEmployees, trips, setTrips, trains, month }) 
       </div>
 
       {adding && <TripModal employees={employees} setEmployees={setEmployees} trains={trains} month={month} onSave={add} onClose={() => setAdding(false)} />}
-      {addingBatch && <BatchTripModal employees={employees} trains={trains} trips={trips} month={month} onAddTrips={addBatch} onClose={() => setAddingBatch(false)} />}
+      {addingBatch && <BatchTripModal employees={employees} trains={trains} trips={trips} month={month} onAddTrips={addBatch} onClose={() => setAddingBatch(false)} setPenalties={setPenalties} />}
     </div>
   );
 }
@@ -1493,7 +1493,10 @@ function MiniCalendar({ value, onChange, maxDate, runningDays }) {
 /* ------------------------------------------------------------------ */
 /*  Batch trip modal                                                   */
 /* ------------------------------------------------------------------ */
-function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose }) {
+const isEhk = (desig) => /supervisor|ehk/i.test(desig || "");
+const isJanitor = (desig) => /housekeeper|janitor|cleaner/i.test(desig || "");
+
+function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose, setPenalties }) {
   const todayDate = new Date();
   const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, "0")}-${String(todayDate.getDate()).padStart(2, "0")}`;
   const [date, setDate] = useState(today);
@@ -1593,6 +1596,28 @@ function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose }
     setRows((prev) => prev.map((r) =>
       justSaved.includes(r.empId) ? { ...r, checked: false, food: "", advance: "" } : r
     ));
+
+    // Auto-log shortfall penalty if manpower is less than required
+    if (selectedTrain && setPenalties) {
+      const reqEhk = Number(selectedTrain.ehk) || 0;
+      const reqJan = Number(selectedTrain.janitors) || 0;
+      const actEhk = checked.filter((r) => isEhk(empMap[r.empId]?.designation)).length;
+      const actJan = checked.filter((r) => isJanitor(empMap[r.empId]?.designation)).length;
+      const ehkShort = Math.max(0, reqEhk - actEhk);
+      const janShort = Math.max(0, reqJan - actJan);
+      if ((ehkShort > 0 || janShort > 0) && window.confirm(
+        `Manpower shortfall detected!\n\nEHK: required ${reqEhk}, punched ${actEhk} (short: ${ehkShort})\nJanitors: required ${reqJan}, punched ${actJan} (short: ${janShort})\n\nAuto-log this as a Penalty/Shortfall entry?`
+      )) {
+        setPenalties((prev) => [...prev, {
+          id: uid(),
+          date,
+          trainNo,
+          tripHours: Number(selectedTrain.tripHours) || 0,
+          reqEhk, reqJan, actEhk, actJan,
+          note: `Auto-logged from batch punch`,
+        }]);
+      }
+    }
   };
 
   const visibleIds = new Set(visibleRows.map((r) => r.empId));
