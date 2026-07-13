@@ -44,6 +44,9 @@ const minWageOn = (revs, iso, key) => {
   return applicable ? Number(applicable[key]) || 0 : 0;
 };
 
+// Format ISO date (YYYY-MM-DD) → Indian format (DD-MM-YYYY)
+const fmtDate = (iso) => iso ? `${iso.slice(8, 10)}-${iso.slice(5, 7)}-${iso.slice(0, 4)}` : "";
+
 // penalty for one shortfall record
 const computePenalty = (p, rates, minWages) => {
   const ehkShort = Math.max(0, (Number(p.reqEhk) || 0) - (Number(p.actEhk) || 0));
@@ -637,7 +640,7 @@ function EmpTripsModal({ emps, trips, onClose }) {
       const emp = empMap[t.empId];
       const row = {};
       if (multiEmp) { row["Emp ID"] = emp?.empId || ""; row["Name"] = emp?.name || ""; }
-      row["Date"] = t.date;
+      row["Date"] = fmtDate(t.date);
       row["Train No"] = t.trainNo || "";
       row["Route"] = t.route || "";
       const tripRate = Number(t.rate) || Number(emp?.perTrip) || 0;
