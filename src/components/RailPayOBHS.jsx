@@ -1563,7 +1563,20 @@ function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose }
   const checked = rows.filter((r) => r.checked);
   const valid = date && checked.length > 0;
 
+  const isNonRunningDay = () => {
+    if (!selectedTrain?.days?.length || !date) return false;
+    const dow = new Date(date + "T00:00:00").getDay();
+    const runSet = new Set(selectedTrain.days.map((d) => DOW_MAP[d]));
+    return !runSet.has(dow);
+  };
+
   const save = () => {
+    if (isNonRunningDay()) {
+      setNonRunningWarn(true);
+      clearTimeout(nonRunningTimer.current);
+      nonRunningTimer.current = setTimeout(() => setNonRunningWarn(false), 4000);
+      return;
+    }
     const dupes = checked.filter((r) => alreadyLoggedSet.has(r.empId));
     if (dupes.length > 0) {
       const names = dupes.map((r) => empMap[r.empId]?.name || r.empId).join(", ");
