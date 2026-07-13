@@ -2290,7 +2290,7 @@ function PlanningView({ trains, setTrains, employees, month }) {
         </div>
         <div className="flex items-center gap-1.5 mt-2 text-[11px]" style={{ color: T.slateSoft }}>
           <AlertTriangle size={12} color={T.red} />
-          "short" = us din ki requirement se kam active staff. Train chip pe tap karke us din cancel/restore karo — count apne aap update hoga. Green = regular, orange = special, struck red = cancelled.
+          "short" = fewer active staff than required for the day. Tap a train chip to cancel/restore for that day — the count updates automatically. Green = regular, orange = special, strikethrough red = cancelled.
         </div>
       </div>
 
@@ -2310,7 +2310,7 @@ function PlanningView({ trains, setTrains, employees, month }) {
           ))}
         </div>
         <p className="text-[11px] mt-3" style={{ color: T.slateSoft }}>
-          Total man-trips this month: {monthEhk + monthJan}. Ye planning target hai — actual salary Trip Log se banegi.
+          Total man-trips this month: {monthEhk + monthJan}. This is the planning target — actual salary will be calculated from Trip Log.
         </p>
       </div>
     </div>
@@ -2437,7 +2437,7 @@ function HoursPenaltyView({ trains, employees, trips, month, rates, setRates, mi
             <div className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px]"
               style={{ background: T.amberBg, color: T.amberDk }}>
               <AlertTriangle size={13} />
-              {noHourTrips} trip{noHourTrips > 1 ? "s" : ""} ka round-trip hours nahi mila — us train ko Train Master mein hours ke saath add karo.
+              {noHourTrips} trip{noHourTrips > 1 ? "s" : ""} could not be matched to round-trip hours — add those trains with hours in Train Master.
             </div>
           )}
         </div>

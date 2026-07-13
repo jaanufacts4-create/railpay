@@ -26,14 +26,14 @@ export async function middleware(request) {
   const { data: { user } } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
 
-  // /admin aur /dashboard — login hona chahiye
+  // /admin and /dashboard — require login
   if (!user && (path.startsWith('/dashboard') || path.startsWith('/admin'))) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
   }
 
-  // Login/register page — agar logged in hai toh dashboard pe bhejo
+  // Login/register page — redirect to dashboard if already logged in
   if (user && (path === '/login' || path === '/register')) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';

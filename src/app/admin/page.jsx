@@ -473,7 +473,7 @@ export default function AdminPage() {
           <div className="rounded-xl p-6" style={{ background: T.card, border: `1px solid ${T.line}` }}>
             <div className="font-bold text-sm mb-1" style={{ color: T.ink }}>Import Staff from Excel</div>
             <div className="text-[13px] mb-5" style={{ color: T.slateSoft }}>
-              Client select karo, Excel file upload karo, preview dekho, phir import karo.
+              Select a client, upload an Excel file, preview the data, then import.
             </div>
 
             <div className="space-y-4 max-w-2xl">
@@ -621,7 +621,7 @@ export default function AdminPage() {
                     style={{ borderColor: T.line }} />
                 )}
                 <p className="text-[11px] mt-1" style={{ color: T.slateSoft }}>
-                  Apna QR imgbb.com pe upload karo → link yahan paste karo
+                  Upload your QR to imgbb.com → paste the link here
                 </p>
               </Field>
 
@@ -790,8 +790,8 @@ export default function AdminPage() {
       {confirmDelete && (
         <Modal title="Delete Client?" onClose={() => setConfirmDelete(null)}>
           <p className="text-sm mb-5" style={{ color: T.slate }}>
-            <strong style={{ color: T.ink }}>{confirmDelete.email}</strong> ka account aur unka saara data
-            permanently delete ho jayega. Yeh wapas nahi aayega.
+            The account for <strong style={{ color: T.ink }}>{confirmDelete.email}</strong> and all associated data
+            will be permanently deleted. This cannot be undone.
           </p>
           <div className="flex gap-2">
             <button onClick={() => setConfirmDelete(null)}
