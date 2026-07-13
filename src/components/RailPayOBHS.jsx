@@ -1508,6 +1508,9 @@ function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose, 
   const [nonRunningWarn, setNonRunningWarn] = useState(false);
   const [leftOpen, setLeftOpen] = useState(true);
   const nonRunningTimer = React.useRef(null);
+  // Custom confirm dialog (replaces window.confirm to avoid INP block)
+  const [confirmDialog, setConfirmDialog] = useState(null); // { message, onOk }
+  const [, startSaveTransition] = React.useTransition();
 
   const handleDateChange = (newDate) => {
     setDate(newDate);
@@ -1573,6 +1576,43 @@ function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose, 
     return !runSet.has(dow);
   };
 
+  const doSave = (checkedRows) => {
+    startSaveTransition(() => {
+      const justSaved = checkedRows.map((r) => r.empId);
+      onAddTrips(checkedRows.map((r) => ({
+        empId: r.empId, date, trainNo, route,
+        rate: Number(r.rate) || 0,
+        food: Number(r.food) || 0,
+        advance: Number(r.advance) || 0,
+      })));
+      setSavedEmpIds((prev) => [...new Set([...prev, ...justSaved])]);
+      setRows((prev) => prev.map((r) =>
+        justSaved.includes(r.empId) ? { ...r, checked: false, food: "", advance: "" } : r
+      ));
+
+      // Check shortfall penalty
+      if (selectedTrain && setPenalties) {
+        const reqEhk = Number(selectedTrain.ehk) || 0;
+        const reqJan = Number(selectedTrain.janitors) || 0;
+        const actEhk = checkedRows.filter((r) => isEhk(empMap[r.empId]?.designation)).length;
+        const actJan = checkedRows.filter((r) => isJanitor(empMap[r.empId]?.designation)).length;
+        const ehkShort = Math.max(0, reqEhk - actEhk);
+        const janShort = Math.max(0, reqJan - actJan);
+        if (ehkShort > 0 || janShort > 0) {
+          setConfirmDialog({
+            message: `Manpower shortfall detected!\n\nEHK: required ${reqEhk}, punched ${actEhk} (short: ${ehkShort})\nJanitors: required ${reqJan}, punched ${actJan} (short: ${janShort})\n\nAuto-log as Penalty/Shortfall entry?`,
+            onOk: () => setPenalties((prev) => [...prev, {
+              id: uid(), date, trainNo,
+              tripHours: Number(selectedTrain.tripHours) || 0,
+              reqEhk, reqJan, actEhk, actJan,
+              note: "Auto-logged from batch punch",
+            }]),
+          });
+        }
+      }
+    });
+  };
+
   const save = () => {
     if (isNonRunningDay()) {
       setNonRunningWarn(true);
@@ -1583,41 +1623,13 @@ function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose, 
     const dupes = checked.filter((r) => alreadyLoggedSet.has(r.empId));
     if (dupes.length > 0) {
       const names = dupes.map((r) => empMap[r.empId]?.name || r.empId).join(", ");
-      if (!window.confirm(`${names} already ${dupes.length > 1 ? "have" : "has"} a trip logged for this date & train. Save anyway?`)) return;
+      setConfirmDialog({
+        message: `${names} already ${dupes.length > 1 ? "have" : "has"} a trip logged for this date & train.\n\nSave anyway?`,
+        onOk: () => doSave(checked),
+      });
+      return;
     }
-    const justSaved = checked.map((r) => r.empId);
-    onAddTrips(checked.map((r) => ({
-      empId: r.empId, date, trainNo, route,
-      rate: Number(r.rate) || 0,
-      food: Number(r.food) || 0,
-      advance: Number(r.advance) || 0,
-    })));
-    setSavedEmpIds((prev) => [...new Set([...prev, ...justSaved])]);
-    setRows((prev) => prev.map((r) =>
-      justSaved.includes(r.empId) ? { ...r, checked: false, food: "", advance: "" } : r
-    ));
-
-    // Auto-log shortfall penalty if manpower is less than required
-    if (selectedTrain && setPenalties) {
-      const reqEhk = Number(selectedTrain.ehk) || 0;
-      const reqJan = Number(selectedTrain.janitors) || 0;
-      const actEhk = checked.filter((r) => isEhk(empMap[r.empId]?.designation)).length;
-      const actJan = checked.filter((r) => isJanitor(empMap[r.empId]?.designation)).length;
-      const ehkShort = Math.max(0, reqEhk - actEhk);
-      const janShort = Math.max(0, reqJan - actJan);
-      if ((ehkShort > 0 || janShort > 0) && window.confirm(
-        `Manpower shortfall detected!\n\nEHK: required ${reqEhk}, punched ${actEhk} (short: ${ehkShort})\nJanitors: required ${reqJan}, punched ${actJan} (short: ${janShort})\n\nAuto-log this as a Penalty/Shortfall entry?`
-      )) {
-        setPenalties((prev) => [...prev, {
-          id: uid(),
-          date,
-          trainNo,
-          tripHours: Number(selectedTrain.tripHours) || 0,
-          reqEhk, reqJan, actEhk, actJan,
-          note: `Auto-logged from batch punch`,
-        }]);
-      }
-    }
+    doSave(checked);
   };
 
   const visibleIds = new Set(visibleRows.map((r) => r.empId));
@@ -1633,6 +1645,27 @@ function BatchTripModal({ employees, trains, trips, month, onAddTrips, onClose, 
           <span style={{ fontSize: 16 }}>⚠️</span>
           Train is not running on this day
           <button onClick={() => setNonRunningWarn(false)} className="ml-2 opacity-60 hover:opacity-100" style={{ fontSize: 14 }}>✕</button>
+        </div>
+      )}
+
+      {/* Custom confirm dialog */}
+      {confirmDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.55)" }}>
+          <div className="rounded-2xl shadow-2xl px-6 py-5 max-w-sm w-full mx-4" style={{ background: T.card, border: `1px solid ${T.line}` }}>
+            <div className="text-sm font-semibold mb-4 whitespace-pre-line" style={{ color: T.ink }}>{confirmDialog.message}</div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmDialog(null)}
+                className="px-4 py-2 rounded-lg text-sm font-semibold"
+                style={{ background: T.paper, border: `1px solid ${T.line}`, color: T.slate }}>
+                Cancel
+              </button>
+              <button onClick={() => { confirmDialog.onOk(); setConfirmDialog(null); }}
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+                style={{ background: T.ink }}>
+                OK
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
