@@ -71,6 +71,7 @@ export default function AdminPage() {
   const router = useRouter();
   const supabase = createClient();
   const [tab, setTab] = useState('clients'); // 'clients' | 'import' | 'settings'
+  const [adminUserId, setAdminUserId] = useState('');
 
   // Clients state
   const [users, setUsers] = useState([]);
@@ -135,7 +136,11 @@ export default function AdminPage() {
     }
   }, []);
 
-  useEffect(() => { fetchUsers(); fetchConfig(); }, [fetchUsers, fetchConfig]);
+  useEffect(() => {
+    fetchUsers();
+    fetchConfig();
+    supabase.auth.getUser().then(({ data }) => { if (data?.user) setAdminUserId(data.user.id); });
+  }, [fetchUsers, fetchConfig]);
 
   const handleLogout = async () => { await supabase.auth.signOut(); router.push('/login'); };
 
@@ -478,6 +483,9 @@ export default function AdminPage() {
                   className="mt-1 w-full rounded-lg px-3 py-2.5 text-sm"
                   style={inp}>
                   <option value="">-- Choose a client --</option>
+                  {adminUserId && (
+                    <option value={adminUserId}>⭐ My Account (Admin — jaanufacts4@gmail.com)</option>
+                  )}
                   {users.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.email}{u.firm_name !== '—' ? ` — ${u.firm_name}` : ''}
